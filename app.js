@@ -88,6 +88,10 @@ async function ricaricaTabellaMagazzinoCloud() {
                     let idx = inv.findIndex(i => i.id === idArticoloInModifica);
                     if(idx !== -1) inv[idx] = { id: idArticoloInModifica, nome, cat, qta, min, prezzo };
                 } else {
+                    if (inv.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
+                        alert("⚠️ Un ingrediente con questo nome è già presente.");
+                        return;
+                    }
                     inv.push({ id: Date.now(), nome, cat, qta, min, prezzo });
                 }
 
@@ -130,10 +134,21 @@ window.eliminaArticoloMagazzinoCloud = async function(id, nome) {
     ricaricaTabellaMagazzinoCloud();
 };
 
-// Guardiano costante: se la tabella del magazzino appare a schermo vuota, la popola all'istante
+// CONTROLLO ATTIVAZIONE DINAMICA: Intercetta l'iniezione dell'HTML nella pagina principale
+const observer = new MutationObserver(() => {
+    const tbody = document.getElementById('tabella-magazzino');
+    const form = document.getElementById('form-aggiungi-mp');
+    // Se la tabella esiste ed è vuota o non ancora configurata, attiva il caricamento cloud
+    if (tbody && (!form || !form.onsubmit)) {
+        ricaricaTabellaMagazzinoCloud();
+    }
+});
+observer.observe(document.body, { childList: true, subtree: true });
+
+// Sincronizzazione iniziale di backup
 setInterval(() => {
     const tbody = document.getElementById('tabella-magazzino');
     if (tbody && tbody.children.length <= 1) {
         ricaricaTabellaMagazzinoCloud();
     }
-}, 500);
+}, 1000);
