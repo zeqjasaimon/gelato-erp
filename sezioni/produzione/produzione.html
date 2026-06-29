@@ -1,0 +1,33 @@
+<div class="space-y-6">
+    <div>
+        <h2 class="text-2xl font-bold tracking-tight">Registro Produzione & Lotti</h2>
+        <p class="text-slate-400 text-sm">Scarica le materie prime dal magazzino e traccia il lotto di gelato finale.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Pannello di comando -->
+        <div class="bg-slate-800/40 border border-slate-700/60 p-5 rounded-xl space-y-4 h-fit">
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Avvia Ciclo Pastorizzazione / Mantecazione</h3>
+            
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Seleziona Ricetta base</label>
+                <select id="prod-ricetta-select" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white focus:outline-none"></select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">Moltiplicatore quantità (Kg finali desiderati)</label>
+                <input type="number" id="prod-moltiplicatore" value="5" min="1" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-sm text-white font-mono focus:outline-none">
+            </div>
+            <button onclick="eseguiProduzione()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg text-sm font-medium transition shadow-lg shadow-emerald-700/10">
+                Lancia e Scarica Magazzino
+            </button>
+        </div>
+
+        <!-- Storico lotti estratti -->
+        <div class="lg:col-span-2 bg-slate-800/20 border border-slate-700/40 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-white uppercase tracking-wider mb-4">Lotti estratti in Laboratorio</h3>
+            <div class="space-y-2" id="lista-lotti">
+                <!-- Iniettato via JS -->
+            </div>
+        </div>
+    </div>
+</div>
