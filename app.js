@@ -1,12 +1,15 @@
-// Inizializza l'archivio utenti e garantisce i privilegi dell'Admin Master ad ogni avvio
-let utentiSalvati = JSON.parse(localStorage.getItem('erp_utenti')) || [];
+// 1. INIZIALIZZAZIONE ARCHIVIO UTENTI
+let databaseUtenti = [];
+try {
+    databaseUtenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
+} catch (e) {
+    databaseUtenti = [];
+}
 
-// Cerchiamo se l'admin esiste già nel database locale
-let adminEsistente = utentiSalvati.find(u => u.email === "admin@gelateria.com");
-
-if (!adminEsistente) {
-    // Se non esiste, lo creiamo da zero approvato
-    utentiSalvati.push({
+// Forza la presenza dell'account di Saimon Admin sbloccato
+let adminTrovato = databaseUtenti.find(u => u.email === "admin@gelateria.com");
+if (!adminTrovato) {
+    databaseUtenti.push({
         email: "admin@gelateria.com",
         pass: "master2027",
         nome: "Saimon Admin",
@@ -15,18 +18,17 @@ if (!adminEsistente) {
         gelateria: "Master HQ",
         indirizzo: "Arco, TN"
     });
-    localStorage.setItem('erp_utenti', JSON.stringify(utentiSalvati));
+    localStorage.setItem('erp_utenti', JSON.stringify(databaseUtenti));
 } else {
-    // SE ESISTE GIÀ: Forza i campi per evitare blocchi dovuti a vecchie cache
-    if (adminEsistente.approvato !== true || adminEsistente.ruolo !== "Amministratore") {
-        adminEsistente.approvato = true;
-        adminEsistente.ruolo = "Amministratore";
-        adminEsistente.nome = "Saimon Admin"; // Corregge anche il nome se era vecchio
-        localStorage.setItem('erp_utenti', JSON.stringify(utentiSalvati));
+    if (adminTrovato.approvato !== true || adminTrovato.ruolo !== "Amministratore") {
+        adminTrovato.approvato = true;
+        adminTrovato.ruolo = "Amministratore";
+        adminTrovato.nome = "Saimon Admin";
+        localStorage.setItem('erp_utenti', JSON.stringify(databaseUtenti));
     }
 }
 
-// Configurazione ingredienti di default se non presenti
+// 2. INGREDIENTI BASE DI DEFAULT
 if (!localStorage.getItem('master_default_ingredienti')) {
     const defaultIngredienti = [
         { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
@@ -38,7 +40,7 @@ if (!localStorage.getItem('master_default_ingredienti')) {
 
 let utenteCorrente = null;
 
-// Funzione globale per simulare le email a schermo
+// Simulatore email globale
 window.simulaInvioEmail = function(titolo, messaggio) {
     const box = document.getElementById('email-simulator-box');
     const testo = document.getElementById('email-simulator-text');
@@ -58,13 +60,13 @@ window.mostraLogin = function() {
     document.getElementById('box-login').classList.remove('hidden');
 };
 
-// LOGIN CON CONTROLLO APPROVAZIONE
+// 3. GESTORE ACCESSO (LOGIN)
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
     const pass = document.getElementById('login-password').value;
     
-    const utenti = JSON.parse(localStorage.getItem('erp_utenti'));
+    const utenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
     const utente = utenti.find(u => u.email === email && u.pass === pass);
     
     if (utente) {
@@ -95,7 +97,7 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     }
 });
 
-// REGISTRAZIONE UTENTI
+// 4. GESTORE REGISTRAZIONE
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const titolare = document.getElementById('reg-titolare').value.trim();
@@ -109,35 +111,30 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
         return;
     }
 
-    let utenti = JSON.parse(localStorage.getItem('erp_utenti'));
+    let utenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
     if (utenti.some(u => u.email === email)) {
         alert("⚠️ Email già registrata.");
         return;
     }
 
     utenti.push({ 
-        email, pass, nome: titolare, gelateria, indirizzo, 
+        email: email, pass: pass, nome: titolare, gelateria: gelateria, indirizzo: indirizzo, 
         ruolo: "Operatore", approvato: false 
     });
     localStorage.setItem('erp_utenti', JSON.stringify(utenti));
 
-    alert("🎉 Richiesta inviata con successo! Il tuo profilo è in attesa di approvazione.");
+    alert("🎉 Richiesta inviata! Profilo in attesa di approvazione da parte di Saimon.");
     document.getElementById('register-form').reset();
     window.mostraLogin();
 
+    // Trigger Email 1 e 2
     setTimeout(() => {
-        window.simulaInvioEmail(
-            "📧 Email inviata a: " + email,
-            "Ciao " + titolare + ", abbiamo ricevuto la tua richiesta per la gelateria <strong>" + gelateria + "</strong>. Il nostro team verificherà i dati il prima possibile!"
-        );
+        window.simulaInvioEmail("📧 Email inviata a: " + email, "Ciao " + titolare + ", richiesta ricevuta per <strong>" + gelateria + "</strong>. In attesa di approvazione.");
     }, 1500);
 
     setTimeout(() => {
-        window.simulaInvioEmail(
-            "📧 Email ricevuta da: Saimon Admin (admin@gelateria.com)",
-            "Un nuovo utente si è registrato!<br><strong>Titolare:</strong> " + titolare + "<br><strong>Gelateria:</strong> " + gelateria + "<br><strong>Sede:</strong> " + indirizzo + "<br>Accedi alla Console Master per approvarlo o rifiutarlo."
-        );
-    }, 5000);
+        window.simulaInvioEmail("📧 Richiesta per: Saimon Admin", "Nuova gelateria da verificare:<br><strong>" + gelateria + "</strong> (" + titolare + "). Controlla la Console Master.");
+    }, 4500);
 });
 
 window.logout = function() {
@@ -147,6 +144,7 @@ window.logout = function() {
     window.mostraLogin();
 };
 
+// 5. CARICAMENTO MODULI ASINCRONI
 window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico');
     if (!contenitore) return;
@@ -165,6 +163,6 @@ window.navigaA = async function(sezione) {
         nuovoScript.src = `sezioni/${sezione}/${sezione}.js?v=${new Date().getTime()}`;
         document.body.appendChild(nuovoScript);
     } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 rounded-lg">Errore nel caricamento del modulo ${sezione}.</div>`;
+        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 rounded-lg">Errore di caricamento della sezione.</div>`;
     }
 };
