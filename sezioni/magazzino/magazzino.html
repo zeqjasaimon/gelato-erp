@@ -4,7 +4,7 @@
             <h2 class="text-2xl font-bold tracking-tight text-white">Stoccaggio Materie Prime</h2>
             <p class="text-slate-400 text-sm">Giacenze in tempo reale, scorte e avvisi di sotto-scorta.</p>
         </div>
-        <button onclick="window.apriModalMateria()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 self-start cursor-pointer">
+        <button onclick="if(window.apriModalMateria) { window.apriModalMateria(); } else { alert('Sistema in caricamento, attendi un secondo...'); }" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 self-start cursor-pointer">
             <i class="fa-solid fa-plus"></i> Inserisci Ingrediente
         </button>
     </div>
@@ -100,17 +100,12 @@
     import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     let idArticoloInModifica = null;
-    let giaCaricato = false;
 
     function getUid() {
-        if (window.fbAuth && window.fbAuth.currentUser) {
-            return window.fbAuth.currentUser.uid;
-        }
-        // Fallback temporaneo se l'auth principale espone l'utente in altro modo
-        if (window.utenteLoggato) return window.utenteLoggato.uid;
-        return null;
+        return window.fbAuth && window.fbAuth.currentUser ? window.fbAuth.currentUser.uid : null;
     }
 
+    // ESPOSIZIONE DIRETTA DELLE FUNZIONI SULLA FINESTRA GLOBALE PER ESSERE VISTE DALL'HTML
     window.apriModalMateria = function() {
         idArticoloInModifica = null;
         const form = document.getElementById('form-aggiungi-mp');
@@ -124,13 +119,48 @@
         idArticoloInModifica = null;
     };
 
+    window.avviaModifica = async function(id) {
+        const uid = getUid();
+        if(!uid) return;
+        try {
+            const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
+            if (!docSnap.exists()) return;
+            const item = docSnap.data().articoli.find(i => i.id === id);
+            if (!item) return;
+
+            idArticoloInModifica = id;
+            document.getElementById('mp-nome').value = item.nome;
+            document.getElementById('mp-categoria').value = item.cat || 'Generico';
+            document.getElementById('mp-quantita').value = item.qta;
+            document.getElementById('mp-scorta').value = item.min || 0;
+            document.getElementById('mp-prezzo').value = item.prezzo;
+
+            document.getElementById('modal-titolo').innerText = "🔄 Modifica Ingrediente";
+            document.getElementById('modal-materia').classList.remove('hidden');
+        } catch(e) { console.error(e); }
+    };
+
+    window.eliminaArticolo = async function(id, nome) {
+        const uid = getUid();
+        if(!uid) return;
+        if (!confirm(`Sei sicuro di voler eliminare "${nome}"?`)) return;
+        try {
+            const docRef = doc(window.fbDb, "magazzini", uid);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) return;
+            const nuovo = docSnap.data().articoli.filter(i => i.id !== id);
+            await setDoc(docRef, { articoli: nuovo });
+            caricaTabella();
+        } catch(e) { console.error(e); }
+    };
+
     async function caricaTabella() {
         const uid = getUid();
         const tbody = document.getElementById('tabella-magazzino');
         if (!tbody) return;
 
         if (!uid) {
-            document.getElementById('stato-caricamento').innerText = "⚠️ Errore: Effettua prima il login o attendi l'autenticazione...";
+            document.getElementById('stato-caricamento').innerText = "In attesa di autenticazione Cloud...";
             return;
         }
 
@@ -143,7 +173,7 @@
             let valoreTotale = 0;
 
             if (inventario.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Il tuo magazzino Cloud è vuoto.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Il tuo magazzino Cloud è vuoto. Premi il pulsante in alto per iniziare.</td></tr>`;
                 return;
             }
 
@@ -163,8 +193,8 @@
                         <td class="p-4 font-mono text-right text-emerald-400">€ ${item.prezzo.toFixed(2)}</td>
                         <td class="p-4 text-center">${badge}</td>
                         <td class="p-4 text-center">
-                            <button onclick="window.avviaModifica(${item.id})" class="text-slate-400 hover:text-sky-400 p-1"><i class="fa-solid fa-pen-to-square"></i></button>
-                            <button onclick="window.eliminaArticolo(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1 ml-2"><i class="fa-regular fa-trash-can"></i></button>
+                            <button onclick="window.avviaModifica(${item.id})" class="text-slate-400 hover:text-sky-400 p-1 cursor-pointer"><i class="fa-solid fa-pen-to-square"></i></button>
+                            <button onclick="window.eliminaArticolo(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1 ml-2 cursor-pointer"><i class="fa-regular fa-trash-can"></i></button>
                         </td>
                     </tr>
                 `;
@@ -173,77 +203,48 @@
             if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = inventario.length;
             if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = sottoScorta;
             if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = `€ ${valoreTotale.toFixed(2)}`;
-            giaCaricato = true;
 
         } catch (e) { console.error(e); }
     }
 
-    window.avviaModifica = async function(id) {
-        const uid = getUid();
-        if(!uid) return;
-        const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
-        const item = docSnap.data().articoli.find(i => i.id === id);
-        if (!item) return;
+    // Gestione invio modulo
+    const formElement = document.getElementById('form-aggiungi-mp');
+    if (formElement) {
+        formElement.onsubmit = async function(e) {
+            e.preventDefault();
+            const uid = getUid();
+            if(!uid) { alert("⚠️ Sincronizzazione fallita. Verifica l'account."); return; }
 
-        idArticoloInModifica = id;
-        document.getElementById('mp-nome').value = item.nome;
-        document.getElementById('mp-categoria').value = item.cat || 'Generico';
-        document.getElementById('mp-quantita').value = item.qta;
-        document.getElementById('mp-scorta').value = item.min || 0;
-        document.getElementById('mp-prezzo').value = item.prezzo;
+            const nome = document.getElementById('mp-nome').value.trim();
+            const cat = document.getElementById('mp-categoria').value;
+            const qta = parseFloat(document.getElementById('mp-quantita').value) || 0;
+            const min = parseFloat(document.getElementById('mp-scorta').value) || 0;
+            const prezzo = parseFloat(document.getElementById('mp-prezzo').value) || 0;
 
-        document.getElementById('modal-titolo').innerText = "🔄 Modifica Ingrediente";
-        document.getElementById('modal-materia').classList.remove('hidden');
-    };
+            try {
+                const docRef = doc(window.fbDb, "magazzini", uid);
+                const docSnap = await getDoc(docRef);
+                let inventario = docSnap.exists() ? (docSnap.data().articoli || []) : [];
 
-    window.eliminaArticolo = async function(id, nome) {
-        const uid = getUid();
-        if(!uid) return;
-        if (!confirm(`Eliminare ${nome}?`)) return;
-        const docRef = doc(window.fbDb, "magazzini", uid);
-        const docSnap = await getDoc(docRef);
-        const nuovo = docSnap.data().articoli.filter(i => i.id !== id);
-        await setDoc(docRef, { articoli: nuovo });
-        caricaTabella();
-    };
+                if (idArticoloInModifica !== null) {
+                    let idx = inventario.findIndex(i => i.id === idArticoloInModifica);
+                    if(idx !== -1) inventario[idx] = { id: idArticoloInModifica, nome, cat, qta, min, prezzo };
+                } else {
+                    inventario.push({ id: Date.now(), nome, cat, qta, min, prezzo });
+                }
 
-    document.getElementById('form-aggiungi-mp').onsubmit = async function(e) {
-        e.preventDefault();
-        const uid = getUid();
-        if(!uid) {
-            alert("⚠️ Errore Autenticazione: Non sei connesso al profilo.");
-            return;
-        }
+                await setDoc(docRef, { articoli: inventario });
+                window.chiudiModalMateria();
+                caricaTabella();
+            } catch(error) { console.error(error); }
+        };
+    }
 
-        const nome = document.getElementById('mp-nome').value.trim();
-        const cat = document.getElementById('mp-categoria').value;
-        const qta = parseFloat(document.getElementById('mp-quantita').value) || 0;
-        const min = parseFloat(document.getElementById('mp-scorta').value) || 0;
-        const prezzo = parseFloat(document.getElementById('mp-prezzo').value) || 0;
-
-        const docRef = doc(window.fbDb, "magazzini", uid);
-        const docSnap = await getDoc(docRef);
-        let inventario = docSnap.exists() ? (docSnap.data().articoli || []) : [];
-
-        if (idArticoloInModifica !== null) {
-            let idx = inventario.findIndex(i => i.id === idArticoloInModifica);
-            if(idx !== -1) inventario[idx] = { id: idArticoloInModifica, nome, cat, qta, min, prezzo };
-        } else {
-            inventario.push({ id: Date.now(), nome, cat, qta, min, prezzo });
-        }
-
-        await setDoc(docRef, { articoli: inventario });
-        window.chiudiModalMateria();
-        caricaTabella();
-    };
-
-    // Esegui subito il controllo e ripetilo finché i dati non vengono caricati
-    caricaTabella();
-    const intervallo = setInterval(() => {
-        if (!giaCaricato) {
+    // Controllo automatico dello stato dell'autenticazione
+    let loopCaricamento = setInterval(() => {
+        if (window.fbAuth && window.fbAuth.currentUser) {
             caricaTabella();
-        } else {
-            clearInterval(intervallo);
+            clearInterval(loopCaricamento);
         }
-    }, 1000);
+    }, 500);
 </script>
