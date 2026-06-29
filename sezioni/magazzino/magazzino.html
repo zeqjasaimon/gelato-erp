@@ -2,7 +2,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
             <h2 class="text-2xl font-bold tracking-tight text-white">Stoccaggio Materie Prime</h2>
-            <p class="text-slate-400 text-sm">Giacenzen in tempo reale, scorte e avvisi di sotto-scorta.</p>
+            <p class="text-slate-400 text-sm">Giacenze in tempo reale, scorte e avvisi di sotto-scorta.</p>
         </div>
         <button onclick="window.apriModalMateria()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 self-start cursor-pointer">
             <i class="fa-solid fa-plus"></i> Inserisci Ingrediente
@@ -38,7 +38,7 @@
                     </tr>
                 </thead>
                 <tbody id="tabella-magazzino" class="divide-y divide-slate-800 text-sm">
-                    <tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Caricamento magazzino cloud in corso...</td></tr>
+                    <tr><td colspan="6" class="p-4 text-center text-slate-500 italic" id="stato-caricamento">Connessione al database in corso...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,9 +100,15 @@
     import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     let idArticoloInModifica = null;
+    let giaCaricato = false;
 
     function getUid() {
-        return window.fbAuth && window.fbAuth.currentUser ? window.fbAuth.currentUser.uid : null;
+        if (window.fbAuth && window.fbAuth.currentUser) {
+            return window.fbAuth.currentUser.uid;
+        }
+        // Fallback temporaneo se l'auth principale espone l'utente in altro modo
+        if (window.utenteLoggato) return window.utenteLoggato.uid;
+        return null;
     }
 
     window.apriModalMateria = function() {
@@ -120,10 +126,13 @@
 
     async function caricaTabella() {
         const uid = getUid();
-        if (!uid) return;
-
         const tbody = document.getElementById('tabella-magazzino');
         if (!tbody) return;
+
+        if (!uid) {
+            document.getElementById('stato-caricamento').innerText = "⚠️ Errore: Effettua prima il login o attendi l'autenticazione...";
+            return;
+        }
 
         try {
             const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
@@ -164,12 +173,14 @@
             if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = inventario.length;
             if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = sottoScorta;
             if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = `€ ${valoreTotale.toFixed(2)}`;
+            giaCaricato = true;
 
         } catch (e) { console.error(e); }
     }
 
     window.avviaModifica = async function(id) {
         const uid = getUid();
+        if(!uid) return;
         const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
         const item = docSnap.data().articoli.find(i => i.id === id);
         if (!item) return;
@@ -187,6 +198,7 @@
 
     window.eliminaArticolo = async function(id, nome) {
         const uid = getUid();
+        if(!uid) return;
         if (!confirm(`Eliminare ${nome}?`)) return;
         const docRef = doc(window.fbDb, "magazzini", uid);
         const docSnap = await getDoc(docRef);
@@ -195,11 +207,13 @@
         caricaTabella();
     };
 
-    // Evento Submit agganciato direttamente
     document.getElementById('form-aggiungi-mp').onsubmit = async function(e) {
         e.preventDefault();
         const uid = getUid();
-        if(!uid) return;
+        if(!uid) {
+            alert("⚠️ Errore Autenticazione: Non sei connesso al profilo.");
+            return;
+        }
 
         const nome = document.getElementById('mp-nome').value.trim();
         const cat = document.getElementById('mp-categoria').value;
@@ -223,13 +237,13 @@
         caricaTabella();
     };
 
-    // Loop autonomo di controllo caricamento dati
-    setInterval(() => {
-        if (window.fbAuth && window.fbAuth.currentUser) {
-            const el = document.getElementById('tot-ingredienti');
-            if (el && el.innerText === "0") {
-                caricaTabella();
-            }
+    // Esegui subito il controllo e ripetilo finché i dati non vengono caricati
+    caricaTabella();
+    const intervallo = setInterval(() => {
+        if (!giaCaricato) {
+            caricaTabella();
+        } else {
+            clearInterval(intervallo);
         }
-    }, 800);
+    }, 1000);
 </script>
