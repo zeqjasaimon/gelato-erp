@@ -1,7 +1,9 @@
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 (function() {
-    const emailUtente = localStorage.getItem('current_user_email') || 'admin@gelateria.com';
-    const KEY_INVENTARIO = `mp_inventario_${emailUtente}`;
-    const KEY_RICETTE = `ricette_${emailUtente}`;
+    // Recuperiamo il database e le informazioni di autenticazione dal motore principale (app.js)
+    const db = window.fbDb;
+    const auth = window.fbAuth;
 
     let ingredientiSelezionati = [];
     let idRicettaInModifica = null; // Traccia se stiamo modificando una ricetta esistente
@@ -20,36 +22,87 @@
         ]
     };
 
-    function caricaDati(chiave) {
-        return JSON.parse(localStorage.getItem(chiave)) || [];
+    // Funzione interna per ottenere l'UID dell'utente correntemente loggato su Firebase
+    function getUidUtente() {
+        return auth && auth.currentUser ? auth.currentUser.uid : null;
     }
 
-    function salvaDati(chiave, dati) {
-        localStorage.setItem(chiave, JSON.stringify(dati));
+    // CARICAMENTO ED ESTRAZIONE DATI DIRETTAMENTE DA FIREBASE
+    async function ottieniRicetteCloud(uid) {
+        try {
+            const docRef = doc(db, "ricette", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data().elenco || [];
+            }
+        } catch (error) {
+            console.error("Errore nel recupero delle ricette da Firebase:", error);
+        }
+        return [];
     }
 
-    function inizializzaRicettario() {
+    async function salvaRicetteCloud(uid, elencoRicette) {
+        try {
+            const docRef = doc(db, "ricette", uid);
+            await setDoc(docRef, { elenco: elencoRicette });
+        } catch (error) {
+            console.error("Errore nel salvataggio delle ricette su Firebase:", error);
+            alert("⚠️ Connessione instabile. Impossibile salvare la ricetta online.");
+        }
+    }
+
+    async function ottieniMagazzinoCloud(uid) {
+        try {
+            const docRef = doc(db, "magazzini", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data().articoli || [];
+            }
+        } catch (error) {
+            console.error("Errore nel recupero del magazzino da Firebase:", error);
+        }
+        return [];
+    }
+
+    // INIZIALIZZA IL RICETTARIO CLOUD
+    async function inizializzaRicettario() {
         ingredientiSelezionati = [];
         idRicettaInModifica = null;
+        const uid = getUidUtente();
+
+        if (!uid) {
+            console.error("Nessun utente identificato sul sistema Cloud.");
+            return;
+        }
         
-        let ricette = caricaDati(KEY_RICETTE);
+        let ricette = await ottieniRicetteCloud(uid);
         let esiste = ricette.some(r => r.id === ID_RICETTA_PASTORIZZATA);
         if (!esiste) {
             ricette.unshift(ricettaPastorizzataDefault);
-            salvaDati(KEY_RICETTE, ricette);
+            await salvaRicetteCloud(uid, ricette);
         }
 
         document.getElementById('form-crea-ricetta')?.reset();
         const btnSalva = document.querySelector('#form-crea-ricetta button[type="submit"]');
         if(btnSalva) btnSalva.innerText = "💾 Salva Ricetta nel Libro";
 
+        // Ristabilisce i campi nel caso fossero bloccati da modifiche precedenti
+        const inputNome = document.getElementById('nome-ricetta');
+        const selectTipo = document.getElementById('tipo-ricetta');
+        if (inputNome) inputNome.removeAttribute('disabled');
+        if (selectTipo) selectTipo.removeAttribute('disabled');
+
         aggiornaTabellaIngredientiNuovaRicetta();
-        popolaSelettoreMateriePrime();
-        renderListaRicette();
+        await popolaSelettoreMateriePrime();
+        await renderListaRicette();
     }
 
-    function popolaSelettoreMateriePrime() {
-        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
+    // LEGGE IL MAGAZZINO ONLINE E INIETTA LE MATERIE PRIME NEL SELETTORE
+    async function popolaSelettoreMateriePrime() {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        let inventario = await ottieniMagazzinoCloud(uid);
         const selettore = document.getElementById('seleziona-materia-prima');
         if (!selettore) return;
 
@@ -59,7 +112,10 @@
         });
     }
 
-    window.aggiungiIngredienteARicetta = function() {
+    window.aggiungiIngredienteARicetta = async function() {
+        const uid = getUidUtente();
+        if (!uid) return;
+
         const nome = document.getElementById('seleziona-materia-prima').value;
         const quantita = parseFloat(document.getElementById('quantita-materia-prima').value) || 0;
 
@@ -68,7 +124,7 @@
             return;
         }
 
-        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
+        let inventario = await ottieniMagazzinoCloud(uid);
         const infoMateria = inventario.find(i => i.nome === nome);
         const prezzoAlKg = infoMateria ? infoMateria.prezzo : 0;
 
@@ -123,9 +179,12 @@
         if(elemCosto) elemCosto.innerText = `€ ${costoAlKg.toFixed(2)} / kg`;
     }
 
-    // CARICA LA RICETTA NEL FORM PER ESSERE MODIFICATA
-    window.avviaModificaRicetta = function(id) {
-        let ricette = caricaDati(KEY_RICETTE);
+    // CARICA LA RICETTA ONLINE NEL FORM PER ESSERE MODIFICATA
+    window.avviaModificaRicetta = async function(id) {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        let ricette = await ottieniRicetteCloud(uid);
         const ricetta = ricette.find(r => r.id === id);
         if (!ricetta) return;
 
@@ -133,7 +192,6 @@
         document.getElementById('nome-ricetta').value = ricetta.nome;
         document.getElementById('tipo-ricetta').value = ricetta.tipo || 'Gusto';
         
-        // Se è la pastorizzata fissa, disabilitiamo il cambio nome per sicurezza
         if(id === ID_RICETTA_PASTORIZZATA) {
             document.getElementById('nome-ricetta').setAttribute('disabled', 'true');
             document.getElementById('tipo-ricetta').setAttribute('disabled', 'true');
@@ -142,8 +200,7 @@
             document.getElementById('tipo-ricetta').removeAttribute('disabled');
         }
 
-        // Carica gli ingredienti correnti nel buffer di lavoro
-        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
+        let inventario = await ottieniMagazzinoCloud(uid);
         ingredientiSelezionati = ricetta.ingredienti.map(ing => {
             const mat = inventario.find(i => i.nome.toLowerCase().trim() === ing.nome.toLowerCase().trim());
             return {
@@ -160,8 +217,10 @@
         document.getElementById('nome-ricetta').focus();
     };
 
-    window.salvaRicettaCompleta = function(e) {
+    window.salvaRicettaCompleta = async function(e) {
         if(e) e.preventDefault();
+        const uid = getUidUtente();
+        if (!uid) return;
         
         const nomeRicetta = document.getElementById('nome-ricetta').value.trim();
         const tipoRicetta = document.getElementById('tipo-ricetta').value;
@@ -171,7 +230,7 @@
             return;
         }
 
-        let ricette = caricaDati(KEY_RICETTE);
+        let ricette = await ottieniRicetteCloud(uid);
         
         let pesoTotale = 0;
         let costoTotale = 0;
@@ -181,21 +240,20 @@
         });
 
         if (idRicettaInModifica !== null) {
-            // MODALITÀ AGGIORNAMENTO
+            // MODALITÀ AGGIORNAMENTO CLOUD
             let indice = ricette.findIndex(r => r.id === idRicettaInModifica);
             if (indice !== -1) {
                 ricette[indice].ingredienti = ingredientiSelezionati;
                 ricette[indice].pesoTotale = pesoTotale;
                 ricette[indice].costoTeoricoKg = costoTotale / pesoTotale;
-                // Aggiorna il nome solo se non è quella fissa
                 if(idRicettaInModifica !== ID_RICETTA_PASTORIZZATA) {
                     ricette[indice].nome = nomeRicetta;
                     ricette[indice].tipo = tipoRicetta;
                 }
             }
-            alert("🎉 Ricetta aggiornata con successo!");
+            alert("🎉 Ricetta aggiornata con successo sul Cloud!");
         } else {
-            // MODALITÀ NUOVO INSERIMENTO
+            // MODALITÀ NUOVO INSERIMENTO CLOUD
             ricette.push({
                 id: Date.now(),
                 nome: nomeRicetta,
@@ -205,33 +263,39 @@
                 pesoTotale: pesoTotale,
                 costoTeoricoKg: costoTotale / pesoTotale
             });
-            alert(`🎉 Ricetta "${nomeRicetta}" salvata correttamente!`);
+            alert(`🎉 Ricetta "${nomeRicetta}" salvata correttamente sul tuo account!`);
         }
 
-        // Rimuove i blocchi sui campi form
         document.getElementById('nome-ricetta').removeAttribute('disabled');
         document.getElementById('tipo-ricetta').removeAttribute('disabled');
 
-        salvaDati(KEY_RICETTE, ricette);
-        inizializzaRicettario();
+        await salvaRicetteCloud(uid, ricette);
+        await inizializzaRicettario();
     };
 
-    window.eliminaRicetta = function(id, blindata) {
+    window.eliminaRicetta = async function(id, blindata) {
+        const uid = getUidUtente();
+        if (!uid) return;
+
         if (blindata || id === ID_RICETTA_PASTORIZZATA) {
             alert("🔒 Questa è una ricetta fissa di sistema. Non può essere rimossa, ma puoi modificarne gli ingredienti cliccando sulla matita.");
             return;
         }
         
-        if (!confirm("Sei sicuro di voler eliminare questa ricetta?")) return;
-        let ricette = caricaDati(KEY_RICETTE);
+        if (!confirm("Sei sicuro di voler eliminare questa ricetta dal Cloud?")) return;
+        let ricette = await ottieniRicetteCloud(uid);
         ricette = ricette.filter(r => r.id !== id);
-        salvaDati(KEY_RICETTE, ricette);
-        inizializzaRicettario();
+        
+        await salvaRicetteCloud(uid, ricette);
+        await inizializzaRicettario();
     };
 
-    function renderListaRicette() {
-        let ricette = caricaDati(KEY_RICETTE);
-        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
+    async function renderListaRicette() {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        let ricette = await ottieniRicetteCloud(uid);
+        let inventario = await ottieniMagazzinoCloud(uid);
         const contenitore = document.getElementById('elenco-ricette-salvate');
         if (!contenitore) return;
 
@@ -259,7 +323,6 @@
             
             const èBlindata = ricetta.blindata === true || ricetta.id === ID_RICETTA_PASTORIZZATA;
             
-            // Icone azione: Aggiungiamo il tasto modifica (matita) per tutti
             const bottoneElimina = èBlindata 
                 ? `<span class="text-slate-600 p-1" title="Ineliminabile"><i class="fa-solid fa-lock text-xs text-amber-500/60"></i></span>`
                 : `<button onclick="eliminaRicetta(${ricetta.id}, false)" class="text-slate-500 hover:text-rose-400 p-1 transition cursor-pointer" title="Elimina"><i class="fa-regular fa-trash-can"></i></button>`;
@@ -301,5 +364,6 @@
         });
     }
 
-    inizializzaRicettario();
+    // Piccolo timeout necessario a Firebase Auth per confermare la sessione utente attiva
+    setTimeout(inizializzaRicettario, 400);
 })();
