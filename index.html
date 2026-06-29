@@ -4,43 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GelatoERP Pro</title>
-    <!-- Tailwind CSS per una grafica moderna e pulita -->
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased">
 
-    <!-- LANDING PAGE & LOGIN CONTAINER -->
     <div id="auth-container" class="min-h-screen flex flex-col justify-center items-center px-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950">
-        <div class="max-w-md w-full bg-slate-800/50 backdrop-blur-md p-8 rounded-2xl border border-slate-700/50 shadow-2xl text-center">
-            <div class="text-5xl mb-4">🍦</div>
-            <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-pink-400 via-amber-200 to-sky-400 bg-clip-text text-transparent">
-                GelatoERP Pro
-            </h1>
-            <p class="text-slate-400 mt-2 text-sm">Laboratorio Intelligente & Controllo Produzione</p>
+        <div class="max-w-md w-full bg-slate-800/50 backdrop-blur-md p-8 rounded-2xl border border-slate-700/50 shadow-2xl">
+            
+            <div class="text-center">
+                <div class="text-5xl mb-4">🍦</div>
+                <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-pink-400 via-amber-200 to-sky-400 bg-clip-text text-transparent">
+                    GelatoERP Pro
+                </h1>
+                <p class="text-slate-400 mt-2 text-sm">Laboratorio Intelligente & Controllo Produzione</p>
+            </div>
 
-            <!-- Form di Accesso Rapido -->
-            <form id="login-form" class="mt-8 space-y-4 text-left">
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Email Utente</label>
-                    <input type="email" id="login-email" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="nome@gelateria.com">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Password</label>
-                    <input type="password" id="login-password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="••••••••">
-                </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg transition shadow-lg shadow-indigo-600/20 mt-6">
-                    Accedi al Laboratorio
-                </button>
-            </form>
-            <p id="login-error" class="text-red-400 text-xs mt-3 hidden">Credenziali non valide. Riprova.</p>
+            <div id="box-login" class="mt-8">
+                <h3 class="text-lg font-bold text-white mb-4">Accedi al tuo Laboratorio</h3>
+                <form id="login-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Email Utente</label>
+                        <input type="email" id="login-email" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="nome@gelateria.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Password</label>
+                        <input type="password" id="login-password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="••••••••">
+                    </div>
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2.5 rounded-lg transition shadow-lg shadow-indigo-600/20 mt-4 cursor-pointer">
+                        Accedi
+                    </button>
+                </form>
+                <p class="text-xs text-slate-400 text-center mt-4">
+                    Non hai ancora un account? <button onclick="mostraRegistrazione()" class="text-indigo-400 font-semibold hover:underline cursor-pointer">Registrati qui</button>
+                </p>
+            </div>
+
+            <div id="box-register" class="mt-8 hidden">
+                <h3 class="text-lg font-bold text-white mb-4">Crea un nuovo Profilo Gelateria</h3>
+                <form id="register-form" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Nome Titolare o Gelateria</label>
+                        <input type="text" id="reg-nome" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Es. Gelateria Mario">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Email Registrazione</label>
+                        <input type="email" id="reg-email" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="mario@email.it">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1">Password</label>
+                        <input type="password" id="reg-password" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-indigo-500 transition" placeholder="Minimo 4 caratteri">
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-lg transition shadow-lg shadow-emerald-600/20 mt-4 cursor-pointer">
+                        Crea Account e Attiva Cloud
+                    </button>
+                </form>
+                <p class="text-xs text-slate-400 text-center mt-4">
+                    Hai già un account attivo? <button onclick="mostraLogin()" class="text-indigo-400 font-semibold hover:underline cursor-pointer">Torna al Login</button>
+                </p>
+            </div>
+
+            <p id="auth-message" class="text-xs text-center mt-3 font-medium hidden"></p>
         </div>
     </div>
 
-    <!-- STRUTTURA APPLICAZIONE (Inizialmente nascosta) -->
     <div id="app-container" class="hidden min-h-screen flex flex-col md:flex-row">
-        
-        <!-- Sidebar Navigazione -->
         <aside class="w-full md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between p-4">
             <div>
                 <div class="flex items-center space-x-3 px-2 py-4 border-b border-slate-800 mb-6">
@@ -48,40 +76,35 @@
                     <span class="font-bold text-lg tracking-wide text-indigo-400">GelatoERP</span>
                 </div>
                 <nav class="space-y-1">
-                    <button onclick="navigaA('magazzino')" id="btn-magazzino" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition">
-                        <i class="fa-solid : opacity-75 fa-boxes-stacked w-5"></i> <span>Magazzino</span>
+                    <button onclick="navigaA('magazzino')" id="btn-magazzino" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer">
+                        <i class="fa-solid fa-boxes-stacked w-5"></i> <span>Magazzino</span>
                     </button>
-                    <button onclick="navigaA('ricette')" id="btn-ricette" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition">
+                    <button onclick="navigaA('ricette')" id="btn-ricette" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer">
                         <i class="fa-solid fa-blender w-5"></i> <span>Ricettario</span>
                     </button>
-                    <button onclick="navigaA('produzione')" id="btn-produzione" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition">
+                    <button onclick="navigaA('produzione')" id="btn-produzione" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer">
                         <i class="fa-solid fa-fire-burner w-5"></i> <span>Produzione</span>
                     </button>
-                    <button onclick="navigaA('analisi')" id="btn-analisi" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition">
+                    <button onclick="navigaA('analisi')" id="btn-analisi" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer">
                         <i class="fa-solid fa-chart-pie w-5"></i> <span>Analisi & Costi</span>
                     </button>
                 </nav>
             </div>
             
-            <!-- Profilo & Logout -->
             <div class="border-t border-slate-800 pt-4 mt-6 flex items-center justify-between px-2">
                 <div class="text-xs">
                     <p class="font-medium text-slate-300" id="user-display">Operatore</p>
                     <span class="text-slate-500 uppercase font-bold tracking-widest text-[10px]" id="role-display">Standard</span>
                 </div>
-                <button onclick="logout()" class="text-slate-500 hover:text-red-400 p-2 transition" title="Disconnetti">
+                <button onclick="logout()" class="text-slate-500 hover:text-red-400 p-2 transition cursor-pointer" title="Disconnetti">
                     <i class="fa-solid fa-right-from-bracket text-lg"></i>
                 </button>
             </div>
         </aside>
 
-        <!-- Area Contenuto Dinamico -->
-        <main class="flex-1 p-6 md:p-8 overflow-y-auto" id="contenuto-dinamico">
-            <!-- Qui dentro verranno caricate le varie sezioni della Web App -->
-        </main>
+        <main class="flex-1 p-6 md:p-8 overflow-y-auto" id="contenuto-dinamico"></main>
     </div>
 
-    <!-- Collegamento al file Javascript centrale -->
     <script src="app.js"></script>
 </body>
 </html>
