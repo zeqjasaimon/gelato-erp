@@ -1,13 +1,13 @@
 (function() {
-    // Recupero chiavi in base all'utente loggato
-    const emailUtente = JSON.parse(localStorage.getItem('erp_utenti'))?.find(u => u.email === localStorage.getItem('current_user_email'))?.email || '';
-    const KEY_INVENTARIO = emailUtente ? `mp_inventario_${emailUtente}` : 'mp_inventario';
-    const KEY_RICETTE = emailUtente ? `ricette_${emailUtente}` : 'ricette_gelato';
+    // 1. CHIAVI DI ACCESSO
+    const emailUtente = localStorage.getItem('current_user_email') || 'admin@gelateria.com';
+    const KEY_INVENTARIO = `mp_inventario_${emailUtente}`;
+    const KEY_RICETTE = `ricette_${emailUtente}`;
 
     let ingredientiSelezionati = [];
-
-    // RICETTA DI DEFAULT BLINDATA (Miscela Base Pastorizzata)
     const ID_RICETTA_PASTORIZZATA = 999999;
+
+    // Struttura fissa intoccabile della pastorizzata base
     const ricettaPastorizzataDefault = {
         id: ID_RICETTA_PASTORIZZATA,
         nome: "Miscela Base Pastorizzata",
@@ -21,35 +21,24 @@
         ]
     };
 
-    function caricaDati(chiave, defaultData) {
-        try {
-            return JSON.parse(localStorage.getItem(chiave)) || defaultData;
-        } catch(e) {
-            return defaultData;
-        }
+    function caricaDati(chiave) {
+        return JSON.parse(localStorage.getItem(chiave)) || [];
     }
 
     function salvaDati(chiave, dati) {
         localStorage.setItem(chiave, JSON.stringify(dati));
     }
 
-    // INIZIALIZZA LA SCHERMATA E FORZA LA VOCE DI DEFAULT
+    // 2. AVVIO DELLA SEZIONE
     function inizializzaRicettario() {
         ingredientiSelezionati = [];
         
-        let ricette = caricaDati(KEY_RICETTE, []);
+        let ricette = caricaDati(KEY_RICETTE);
         
-        // CONTROLLO FORZATO: Cerca per ID specifico se c'è la pastorizzata
-        let indicePastorizzata = ricette.findIndex(r => r.id === ID_RICETTA_PASTORIZZATA);
-        
-        if (indicePastorizzata === -1) {
-            // Se non c'è proprio, la spingiamo in cima alla lista
+        // CONTROLLO FORZATO AD OGNI APERTURA DI SCHEDA
+        let esiste = ricette.some(r => r.id === ID_RICETTA_PASTORIZZATA || r.nome.toLowerCase().trim() === "miscela base pastorizzata");
+        if (!esiste) {
             ricette.unshift(ricettaPastorizzataDefault);
-            salvaDati(KEY_RICETTE, ricette);
-        } else {
-            // Se c'è ma era la vecchia versione, assicuriamoci che abbia i flag corretti
-            ricette[indicePastorizzata].blindata = true;
-            ricette[indicePastorizzata].tipo = "Semilavorato";
             salvaDati(KEY_RICETTE, ricette);
         }
 
@@ -58,19 +47,20 @@
         renderListaRicette();
     }
 
-    // POPOLA IL MENU A TENDINA CON GLI INGREDIENTI
+    // 3. SELETTORE DELLE MATERIE PRIME
     function popolaSelettoreMateriePrime() {
-        const inventario = caricaDati(KEY_INVENTARIO, []);
+        // Se non trova l'inventario personalizzato, prova a prendere quello master di default
+        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
         const selettore = document.getElementById('seleziona-materia-prima');
         if (!selettore) return;
 
         selettore.innerHTML = '<option value="">-- Seleziona Ingrediente --</option>';
         inventario.forEach(item => {
-            selettore.innerHTML += `<option value="${item.nome}">🍦 ${item.nome} (€ ${item.prezzo.toFixed(2)}/kg)</option>`;
+            selettore.innerHTML += `<option value="${item.nome}">🍦 ${item.nome} (€ ${(item.prezzo || 0).toFixed(2)}/kg)</option>`;
         });
     }
 
-    // AGGIUNGE UN INGREDIENTE ALLA RICETTA IN CORSO
+    // 4. LOGICA AGGIUNTA INGREDIENTI
     window.aggiungiIngredienteARicetta = function() {
         const nome = document.getElementById('seleziona-materia-prima').value;
         const quantita = parseFloat(document.getElementById('quantita-materia-prima').value) || 0;
@@ -80,7 +70,7 @@
             return;
         }
 
-        const inventario = caricaDati(KEY_INVENTARIO, []);
+        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
         const infoMateria = inventario.find(i => i.nome === nome);
         const prezzoAlKg = infoMateria ? infoMateria.prezzo : 0;
 
@@ -135,6 +125,7 @@
         if(elemCosto) elemCosto.innerText = `€ ${costoAlKg.toFixed(2)} / kg`;
     }
 
+    // 5. SALVATAGGIO
     window.salvaRicettaCompleta = function(e) {
         if(e) e.preventDefault();
         
@@ -146,7 +137,7 @@
             return;
         }
 
-        let ricette = caricaDati(KEY_RICETTE, []);
+        let ricette = caricaDati(KEY_RICETTE);
         
         let pesoTotale = 0;
         let costoTotale = 0;
@@ -173,25 +164,30 @@
 
     window.eliminaRicetta = function(id, blindata) {
         if (blindata || id === ID_RICETTA_PASTORIZZATA) {
-            alert("🔒 Questa è una ricetta di sistema predefinita (Semilavorato Base). Non può essere eliminata.");
+            alert("🔒 Questa è una ricetta fissa di sistema. Non può essere rimossa.");
             return;
         }
         
         if (!confirm("Sei sicuro di voler eliminare questa ricetta?")) return;
-        let ricette = caricaDati(KEY_RICETTE, []);
+        let ricette = caricaDati(KEY_RICETTE);
         ricette = ricette.filter(r => r.id !== id);
         salvaDati(KEY_RICETTE, ricette);
         inizializzaRicettario();
     };
 
-    // RENDERING LISTA RICETTE
+    // 6. RENDER DEI BOX RICETTA A SCHERMO
     function renderListaRicette() {
-        const ricette = caricaDati(KEY_RICETTE, []);
-        const inventario = caricaDati(KEY_INVENTARIO, []);
+        let ricette = caricaDati(KEY_RICETTE);
+        let inventario = JSON.parse(localStorage.getItem(KEY_INVENTARIO)) || JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
         const contenitore = document.getElementById('elenco-ricette-salvate');
         if (!contenitore) return;
 
         contenitore.innerHTML = "";
+
+        // Forza la presenza della pastorizzata nell'array da mostrare a video
+        if (!ricette.some(r => r.id === ID_RICETTA_PASTORIZZATA)) {
+            ricette.unshift(ricettaPastorizzataDefault);
+        }
 
         ricette.forEach(ricetta => {
             let costoTotaleAggiornato = 0;
@@ -215,7 +211,7 @@
             
             const èBlindata = ricetta.blindata === true || ricetta.id === ID_RICETTA_PASTORIZZATA;
             const bottoneElimina = èBlindata 
-                ? `<span class="text-slate-600 p-1 cursor-not-allowed"><i class="fa-solid fa-lock text-sm text-amber-500/70"></i></span>`
+                ? `<span class="text-slate-600 p-1"><i class="fa-solid fa-lock text-sm text-amber-500/70"></i></span>`
                 : `<button onclick="eliminaRicetta(${ricetta.id}, false)" class="text-slate-500 hover:text-rose-400 p-1 transition cursor-pointer"><i class="fa-regular fa-trash-can"></i></button>`;
 
             contenitore.innerHTML += `
