@@ -1,0 +1,48 @@
+<div class="space-y-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+            <h2 class="text-2xl font-bold tracking-tight">Stoccaggio Materie Prime</h2>
+            <p class="text-slate-400 text-sm">Giacenze in tempo reale, scorte e avvisi di sotto-scorta.</p>
+        </div>
+        <button onclick="apriModalMateria()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 self-start">
+            <i class="fa-solid fa-plus"></i> Inserisci Ingrediente
+        </button>
+    </div>
+
+    <!-- Griglia riassuntiva -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ingredienti Totali</p>
+            <p class="text-3xl font-bold mt-2 text-indigo-400" id="tot-ingredienti">0</p>
+        </div>
+        <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Allarme Sotto-Scorta</p>
+            <p class="text-3xl font-bold mt-2 text-red-400" id="tot-sottoscorta">0</p>
+        </div>
+        <div class="bg-slate-800/40 border border-slate-700/60 p-4 rounded-xl">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Valore Inventario</p>
+            <p class="text-3xl font-bold mt-2 text-emerald-400" id="valore-magazzino">€ 0.00</p>
+        </div>
+    </div>
+
+    <!-- Tabella Elementi -->
+    <div class="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-900/60 border-b border-slate-700/60 text-xs font-semibold tracking-wider text-slate-400 uppercase">
+                        <th class="p-4">Ingrediente</th>
+                        <th class="p-4">Categoria</th>
+                        <th class="p-4 text-right">Giacenza</th>
+                        <th class="p-4 text-right">Prezzo/Kg</th>
+                        <th class="p-4 text-center">Stato</th>
+                        <th class="p-4 text-center">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody id="tabella-magazzino" class="divide-y divide-slate-800 text-sm">
+                    <!-- Iniettato via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
