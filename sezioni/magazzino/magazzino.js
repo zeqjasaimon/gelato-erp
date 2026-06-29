@@ -20,7 +20,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             return;
         }
 
-        // Reset del form se presente nella tua modale originale
         const form = document.getElementById('form-aggiungi-mp');
         if (form) form.reset();
         
@@ -30,7 +29,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         await renderTabellaMagazzino();
     }
 
-    // FUNZIONE PER SCARICARE I DATI DA FIREBASE
     async function ottieniArticoliCloud(uid) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -44,7 +42,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         return [];
     }
 
-    // FUNZIONE PER SALVARE I DATI SU FIREBASE
     async function salvaArticoliCloud(uid, articoli) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -55,7 +52,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     }
 
-    // AGGANCIO AL FORM DI INSERIMENTO ORIGINALE
     const formMp = document.getElementById('form-aggiungi-mp');
     if (formMp) {
         const nuovoForm = formMp.cloneNode(true);
@@ -66,7 +62,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const uid = getUidUtente();
             if (!uid) return;
 
-            // Mappatura flessibile degli ID per essere sicuri al 100% di leggere i tuoi campi
             const elNome = document.getElementById('mp-nome') || document.getElementById('nome');
             const elCat = document.getElementById('mp-categoria') || document.getElementById('categoria');
             const elQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta') || document.getElementById('giacenza');
@@ -80,14 +75,13 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const prezzo = elPrezzo ? (parseFloat(elPrezzo.value) || 0) : 0;
 
             if (!nome) {
-                alert("⚠️ Inserisci almeno il nome dell'ingrediente.");
+                alert("⚠️ Inserisci il nome dell'ingrediente.");
                 return;
             }
 
             let inventario = await ottieniArticoliCloud(uid);
 
             if (idArticoloInModifica !== null) {
-                // MODALITÀ MODIFICA
                 let indice = inventario.findIndex(item => item.id === idArticoloInModifica);
                 if (indice !== -1) {
                     inventario[indice].nome = nome;
@@ -98,19 +92,16 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                     alert(`🎉 Ingrediente "${nome}" aggiornato sul Cloud!`);
                 }
             } else {
-                // MODALITÀ NUOVO
                 if (inventario.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
                     alert("⚠️ Un ingrediente con questo nome è già presente in magazzino.");
                     return;
                 }
-
                 inventario.push({ id: Date.now(), nome, cat, qta, min, prezzo });
                 alert(`🎉 Nuovo ingrediente "${nome}" salvato sul Cloud!`);
             }
 
             await salvaArticoliCloud(uid, inventario);
             
-            // Chiude la modale se presente nel tuo HTML originale
             const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
             if (modal) modal.classList.add('hidden');
             
@@ -118,7 +109,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         });
     }
 
-    // FUNZIONE RICHIESTA DAL TUO PULSANTE ORIGINALE NEL FILE HTML
     window.apriModalMateria = function() {
         idArticoloInModifica = null;
         const form = document.getElementById('form-aggiungi-mp');
@@ -127,25 +117,21 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
 
-        // Mostra la finestra modale originale impostata nel tuo HTML
         const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
         if (modal) {
             modal.classList.remove('hidden');
         } else {
-            // Se non trova la modale per qualche motivo, fa lo scroll al form per sicurezza
             const inputNome = document.getElementById('mp-nome') || document.getElementById('nome');
             if (inputNome) inputNome.focus();
         }
     };
 
-    // FUNZIONE PER CHIUDERE LA FINESTRA
     window.chiudiModalMateria = function() {
         const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
         if (modal) modal.classList.add('hidden');
         idArticoloInModifica = null;
     };
 
-    // MODIFICA ARTICOLO ESISTENTE
     window.avviaModificaArticolo = async function(id) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -176,7 +162,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         if (elNome) elNome.focus();
     };
 
-    // MOVIMENTO RAPIDO DI CARICO/SCARICO SUL CLOUD
     window.aggiornaGiacenzaRapida = async function(id) {
         const uid = getUidUtente();
         const input = document.getElementById(`rapido-${id}`);
@@ -196,7 +181,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     };
 
-    // ELIMINA ARTICOLO DAL CLOUD
     window.eliminaArticoloMagazzino = async function(id, nome) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -210,7 +194,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         await renderTabellaMagazzino();
     };
 
-    // RENDERING DELLA TABELLA CON I DATI IN TEMPO REALE E AGGIORNAMENTO CONTATORI
+    // RENDERING STRUTTURATO SULL'HTML ORIGINALE (6 COLONNE)
     async function renderTabellaMagazzino() {
         const uid = getUidUtente();
         if (!uid) return;
@@ -238,30 +222,30 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             valoreTotaleMagazzino += (item.qta * item.prezzo);
 
             const rigaAllarmeClass = sottoSoglia ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-slate-800/20';
-            const badgeSottoSoglia = sottoSoglia ? `<span class="ml-2 text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase">Scorta Minima</span>` : '';
+            
+            // Stato grafico (Badge) per rispettare la 5° colonna del tuo HTML
+            const badgeStato = sottoSoglia 
+                ? `<span class="px-2 py-1 text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded-md uppercase tracking-wider">Sotto Scorta</span>`
+                : `<span class="px-2 py-1 text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-md uppercase tracking-wider">OK</span>`;
 
             tbody.innerHTML += `
                 <tr class="text-slate-300 border-b border-slate-800/60 text-xs ${rigaAllarmeClass}">
-                    <td class="p-4">
-                        <span class="font-bold text-white text-sm">${item.nome}</span> ${badgeSottoSoglia}
-                    </td>
+                    <td class="p-4 font-bold text-white text-sm">${item.nome}</td>
+                    
                     <td class="p-4 uppercase text-slate-400 font-semibold tracking-wider text-[10px]">${item.cat || 'Generico'}</td>
+                    
                     <td class="p-4 font-mono text-right text-sm ${sottoSoglia ? 'text-rose-400 font-bold' : 'text-sky-400 font-semibold'}">${(item.qta || 0).toFixed(2)} kg</td>
+                    
                     <td class="p-4 font-mono text-right text-emerald-400 font-medium">€ ${(item.prezzo || 0).toFixed(2)}</td>
-                    <td class="p-4 text-center">
-                        <div class="flex items-center justify-center gap-1 max-w-[120px] mx-auto">
-                            <input type="number" id="rapido-${item.id}" placeholder="± Kg" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs text-white focus:outline-none">
-                            <button onclick="aggiornaGiacenzaRapida(${item.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-1 rounded transition cursor-pointer">
-                                <i class="fa-solid fa-square-plus text-sm"></i>
-                            </button>
-                        </div>
-                    </td>
+                    
+                    <td class="p-4 text-center">${badgeStato}</td>
+                    
                     <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-2">
-                            <button onclick="avviaModificaArticolo(${item.id})" class="text-slate-400 hover:text-sky-400 p-1.5 transition cursor-pointer">
+                            <button onclick="avviaModificaArticolo(${item.id})" class="text-slate-400 hover:text-sky-400 p-1.5 transition cursor-pointer" title="Modifica">
                                 <i class="fa-solid fa-pen-to-square text-sm"></i>
                             </button>
-                            <button onclick="eliminaArticoloMagazzino(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1.5 transition cursor-pointer">
+                            <button onclick="eliminaArticoloMagazzino(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1.5 transition cursor-pointer" title="Elimina">
                                 <i class="fa-regular fa-trash-can text-sm"></i>
                             </button>
                         </div>
@@ -270,7 +254,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             `;
         });
 
-        // Aggiorna le tre etichette riassuntive in alto
         if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = inventario.length;
         if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = contatoreSottoScorta;
         if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = `€ ${valoreTotaleMagazzino.toFixed(2)}`;
