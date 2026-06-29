@@ -1,58 +1,87 @@
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
 (function() {
-    // Recupero chiavi in base all'utente loggato
-    const emailUtente = localStorage.getItem('current_user_email') || 'admin@gelateria.com';
-    const KEY_INVENTARIO = `mp_inventario_${emailUtente}`;
+    // Recuperiamo l'istanza del database Cloud passata da app.js
+    const db = window.fbDb;
+    const auth = window.fbAuth;
 
-    let idArticoloInModifica = null; // Traccia se stiamo modificando un ingrediente esistente
+    let idArticoloInModifica = null;
 
-    function caricaDati(chiave) {
-        return JSON.parse(localStorage.getItem(chiave));
+    // Funzione interna per verificare che l'utente sia effettivamente loggato su Firebase
+    function getUidUtente() {
+        if (auth && auth.currentUser) {
+            return auth.currentUser.uid;
+        }
+        return null;
     }
 
-    function salvaDati(chiave, dati) {
-        localStorage.setItem(chiave, JSON.stringify(dati));
-    }
-
-    // INIZIALIZZA IL MAGAZZINO
-    function inizializzaMagazzino() {
+    // INIZIALIZZA IL MAGAZZINO CLOUD
+    async function inizializzaMagazzino() {
         idArticoloInModifica = null;
+        const uid = getUidUtente();
         
-        // Se il magazzino dell'utente è vuoto, carica il pacchetto base impostato dalla Console Master
-        if (!localStorage.getItem(KEY_INVENTARIO)) {
-            const masterDefaults = JSON.parse(localStorage.getItem('master_default_ingredienti')) || [];
-            salvaDati(KEY_INVENTARIO, masterDefaults);
+        if (!uid) {
+            console.error("Nessun utente loggato su Firebase.");
+            return;
         }
 
-        // Reset del form e del testo del bottone
+        // Reset visivo del form
         const form = document.getElementById('form-aggiungi-mp');
         if (form) form.reset();
         
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
 
-        renderTabellaMagazzino();
+        // Scarica i dati dal Cloud e renderizza la tabella
+        await renderTabellaMagazzino();
     }
 
-    // GESTIONE INSERIMENTO O MODIFICA ARTICOLO
+    // FUNZIONE PER SCARICARE L'ARRAY DI ARTICOLI DA FIREBASE
+    async function ottieniArticoliCloud(uid) {
+        try {
+            const docRef = doc(db, "magazzini", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data().articoli || [];
+            }
+        } catch (error) {
+            console.error("Errore nel recupero dei dati dal Cloud:", error);
+        }
+        return [];
+    }
+
+    // FUNZIONE PER SALVARE L'ARRAY DI ARTICOLI SU FIREBASE
+    async function salvaArticoliCloud(uid, articoli) {
+        try {
+            const docRef = doc(db, "magazzini", uid);
+            await setDoc(docRef, { articoli: articoli });
+        } catch (error) {
+            console.error("Errore nel salvataggio dei dati sul Cloud:", error);
+            alert("⚠️ Errore di connessione al Cloud. Riprova.");
+        }
+    }
+
+    // GESTIONE INSERIMENTO O MODIFICA ARTICOLO CLOUD
     const formMp = document.getElementById('form-aggiungi-mp');
     if (formMp) {
-        // Rimuove vecchi listener per evitare doppi inserimenti
         const nuovoForm = formMp.cloneNode(true);
         formMp.parentNode.replaceChild(nuovoForm, formMp);
 
-        nuovoForm.addEventListener('submit', function(e) {
+        nuovoForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+            const uid = getUidUtente();
+            if (!uid) return;
+
             const nome = document.getElementById('mp-nome').value.trim();
             const cat = document.getElementById('mp-categoria').value;
             const qta = parseFloat(document.getElementById('mp-qta').value) || 0;
             const min = parseFloat(document.getElementById('mp-min').value) || 0;
             const prezzo = parseFloat(document.getElementById('mp-prezzo').value) || 0;
 
-            let inventario = caricaDati(KEY_INVENTARIO) || [];
+            let inventario = await ottieniArticoliCloud(uid);
 
             if (idArticoloInModifica !== null) {
-                // MODALITÀ AGGIORNAMENTO
+                // MODALITÀ AGGIORNAMENTO SU CLOUD
                 let indice = inventario.findIndex(item => item.id === idArticoloInModifica);
                 if (indice !== -1) {
                     inventario[indice].nome = nome;
@@ -60,10 +89,10 @@
                     inventario[indice].qta = qta;
                     inventario[indice].min = min;
                     inventario[indice].prezzo = prezzo;
-                    alert(`🎉 Ingrediente "${nome}" aggiornato con successo!`);
+                    alert(`🎉 Ingrediente "${nome}" aggiornato sul Cloud!`);
                 }
             } else {
-                // MODALITÀ NUOVO ARTICOLO
+                // MODALITÀ NUOVO ARTICOLO SU CLOUD
                 if (inventario.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
                     alert("⚠️ Un ingrediente con questo nome è già presente in magazzino.");
                     return;
@@ -77,69 +106,77 @@
                     min: min,
                     prezzo: prezzo
                 });
-                alert(`🎉 Nuovo ingrediente "${nome}" inserito nel magazzino!`);
+                alert(`🎉 Nuovo ingrediente "${nome}" salvato sul Cloud!`);
             }
 
-            salvaDati(KEY_INVENTARIO, inventario);
+            await salvaArticoliCloud(uid, inventario);
             inizializzaMagazzino();
         });
     }
 
     // CARICA L'ARTICOLO NEL FORM IN ALTO PER LA MODIFICA
-    window.avviaModificaArticolo = function(id) {
-        let inventario = caricaDati(KEY_INVENTARIO) || [];
+    window.avviaModificaArticolo = async function(id) {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        let inventario = await ottieniArticoliCloud(uid);
         const articolo = inventario.find(i => i.id === id);
         if (!articolo) return;
 
         idArticoloInModifica = id;
 
-        // Popola i campi del form con i dati attuali
         document.getElementById('mp-nome').value = articolo.nome;
         document.getElementById('mp-categoria').value = articolo.cat || 'Base Liquida';
         document.getElementById('mp-qta').value = articolo.qta;
         document.getElementById('mp-min').value = articolo.min;
         document.getElementById('mp-prezzo').value = articolo.prezzo;
 
-        // Cambia il testo del pulsante per indicare la modifica
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "🔄 Aggiorna Articolo";
 
-        // Sposta il focus sul primo campo per comodità
         document.getElementById('mp-nome').focus();
     };
 
-    // FUNZIONE RAPIDA PER FARE SOLO IL CARICO/SCARICO DI KG (VELOCE)
-    window.aggiornaGiacenzaRapida = function(id) {
+    // MOVIMENTO RAPIDO DI CARICO/SCARICO SUL CLOUD
+    window.aggiornaGiacenzaRapida = async function(id) {
+        const uid = getUidUtente();
         const input = document.getElementById(`rapido-${id}`);
         const valore = parseFloat(input.value) || 0;
-        if (valore === 0) return;
+        if (valore === 0 || !uid) return;
 
-        let inventario = caricaDati(KEY_INVENTARIO) || [];
+        let inventario = await ottieniArticoliCloud(uid);
         let articolo = inventario.find(i => i.id === id);
         
         if (articolo) {
             articolo.qta += valore;
-            if (articolo.qta < 0) articolo.qta = 0; // Impedisce scorte negative accidentali da questa interfaccia
-            salvaDati(KEY_INVENTARIO, inventario);
-            renderTabellaMagazzino();
+            if (articolo.qta < 0) articolo.qta = 0;
+            
+            await salvaArticoliCloud(uid, inventario);
+            await renderTabellaMagazzino();
             input.value = "";
-            alert(`⚙️ Giacenza aggiornata per ${articolo.nome}.`);
         }
     };
 
-    // ELIMINA ARTICOLO
-    window.eliminaArticoloMagazzino = function(id, nome) {
-        if (!confirm(`Sei sicuro di voler eliminare "${nome}" dal magazzino?`)) return;
+    // ELIMINA ARTICOLO DAL CLOUD
+    window.eliminaArticoloMagazzino = async function(id, nome) {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        if (!confirm(`Sei sicuro di voler eliminare "${nome}" dal magazzino Cloud?`)) return;
         
-        let inventario = caricaDati(KEY_INVENTARIO) || [];
+        let inventario = await ottieniArticoliCloud(uid);
         inventario = inventario.filter(i => i.id !== id);
-        salvaDati(KEY_INVENTARIO, inventario);
+        
+        await salvaArticoliCloud(uid, inventario);
         inizializzaMagazzino();
     };
 
-    // RENDERING DELLA TABELLA A SCHERMO
-    function renderTabellaMagazzino() {
-        const inventario = caricaDati(KEY_INVENTARIO) || [];
+    // RENDERING DELLA TABELLA CON I DATI IN TEMPO REALE
+    async function renderTabellaMagazzino() {
+        const uid = getUidUtente();
+        if (!uid) return;
+
+        const inventario = await ottieniArticoliCloud(uid);
         const tbody = document.getElementById('tabella-magazzino');
         if (!tbody) return;
 
@@ -153,7 +190,7 @@
         inventario.forEach(item => {
             const sottoSoglia = item.qta <= (item.min || 0);
             const rigaAllarmeClass = sottoSoglia ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-slate-800/20';
-            const badgeSottoSoglia = sottoSoglia ? `<span class="ml-2 text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase animate-pulse">Scorta Minima</span>` : '';
+            const badgeSottoSoglia = sottoSoglia ? `<span class="ml-2 text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase">Scorta Minima</span>` : '';
 
             tbody.innerHTML += `
                 <tr class="text-slate-300 border-b border-slate-800/60 text-xs ${rigaAllarmeClass}">
@@ -165,23 +202,21 @@
                     <td class="p-3 font-mono text-right text-slate-400">${(item.min || 0).toFixed(1)} kg</td>
                     <td class="p-3 font-mono text-right text-emerald-400 font-medium">€ ${(item.prezzo || 0).toFixed(2)}</td>
                     
-                    <!-- AGGIORNAMENTO RAPIDO QUANTITÀ -->
                     <td class="p-3 text-center">
                         <div class="flex items-center justify-center gap-1 max-w-[120px] mx-auto">
-                            <input type="number" id="rapido-${item.id}" placeholder="± Kg" class="w-14 bg-slate-950 border border-slate-800 rounded px-1.5 py-1 text-center text-xs text-white focus:outline-none focus:border-sky-500">
-                            <button onclick="aggiornaGiacenzaRapida(${item.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-1 rounded transition cursor-pointer" title="Applica movimento rapido">
+                            <input type="number" id="rapido-${item.id}" placeholder="± Kg" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <button onclick="aggiornaGiacenzaRapida(${item.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-1 rounded transition cursor-pointer">
                                 <i class="fa-solid fa-square-plus text-sm"></i>
                             </button>
                         </div>
                     </td>
                     
-                    <!-- AZIONI: MODIFICA ED ELIMINAZIONE -->
                     <td class="p-3 text-center">
                         <div class="flex items-center justify-center gap-2">
-                            <button onclick="avviaModificaArticolo(${item.id})" class="text-slate-400 hover:text-sky-400 p-1.5 transition cursor-pointer" title="Modifica Anagrafica/Prezzo">
+                            <button onclick="avviaModificaArticolo(${item.id})" class="text-slate-400 hover:text-sky-400 p-1.5 transition cursor-pointer">
                                 <i class="fa-solid fa-pen-to-square text-sm"></i>
                             </button>
-                            <button onclick="eliminaArticoloMagazzino(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1.5 transition cursor-pointer" title="Elimina">
+                            <button onclick="eliminaArticoloMagazzino(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1.5 transition cursor-pointer">
                                 <i class="fa-regular fa-trash-can text-sm"></i>
                             </button>
                         </div>
@@ -191,5 +226,6 @@
         });
     }
 
-    inizializzaMagazzino();
+    // Eseguiamo il boot iniziale aspettando una frazione di secondo che Firebase dichiari l'utente loggato
+    setTimeout(inizializzaMagazzino, 400);
 })();
