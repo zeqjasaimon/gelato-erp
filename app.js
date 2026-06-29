@@ -1,75 +1,165 @@
-// 1. INIZIALIZZAZIONE ARCHIVIO UTENTI
-let databaseUtenti = [];
-try {
-    databaseUtenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
-} catch (e) {
-    databaseUtenti = [];
-}
+// ==========================================
+// 1. IMPORTAZIONE MODULI FIREBASE (CLOUD)
+// ==========================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { 
+    getAuth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { 
+    getFirestore, 
+    doc, 
+    setDoc, 
+    getDoc 
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// Garantisce i privilegi dell'Admin Master ad ogni avvio
-let adminTrovato = databaseUtenti.find(u => u.email === "admin@gelateria.com");
-if (!adminTrovato) {
-    databaseUtenti.push({
-        email: "admin@gelateria.com",
-        pass: "master2027",
-        nome: "Saimon Admin",
-        ruolo: "Amministratore",
-        approvato: true,
-        gelateria: "Master HQ",
-        indirizzo: "Arco, TN"
-    });
-    localStorage.setItem('erp_utenti', JSON.stringify(databaseUtenti));
-} else {
-    if (adminTrovato.approvato !== true || adminTrovato.ruolo !== "Amministratore") {
-        adminTrovato.approvato = true;
-        adminTrovato.ruolo = "Amministratore";
-        adminTrovato.nome = "Saimon Admin";
-        localStorage.setItem('erp_utenti', JSON.stringify(databaseUtenti));
+// La tua configurazione ufficiale salvata su Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyDAVkzzL0oaEZ0ajP7ol-8WtwbXOSMFRR4",
+  authDomain: "gelateria-erp.firebaseapp.com",
+  projectId: "gelateria-erp",
+  storageBucket: "gelateria-erp.firebasestorage.app",
+  messagingSenderId: "614362128350",
+  appId: "1:614362128350:web:00dc0d950061a8274a874f",
+  measurementId: "G-E0ZRTLQL6E"
+};
+
+// Inizializzazione dei servizi Cloud
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// Rendiamo i servizi accessibili anche agli altri file (.js) delle sezioni
+window.fbAuth = auth;
+window.fbDb = db;
+
+// ==========================================
+// 2. LOGICA DI CONTROLLO ACCESSO (AUTH LOOPS)
+// ==========================================
+
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const docRef = doc(db, "utenti", user.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            const datiUtente = docSnap.data();
+
+            if (!datiUtente.approvato) {
+                alert("⚠️ Il tuo account è in fase di revisione. Riceverai una mail non appena Saimon approverà la tua richiesta!");
+                await signOut(auth);
+                return;
+            }
+
+            localStorage.setItem('current_user_email', datiUtente.email);
+
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            
+            document.getElementById('user-display').innerText = datiUtente.nome;
+            document.getElementById('role-display').innerText = datiUtente.ruolo;
+            
+            const btnConsole = document.getElementById('btn-console');
+            if (btnConsole) {
+                if (datiUtente.ruolo === "Amministratore") {
+                    btnConsole.classList.remove('hidden');
+                } else {
+                    btnConsole.classList.add('hidden');
+                }
+            }
+            
+            window.navigaA('magazzino');
+        }
+    } else {
+        localStorage.removeItem('current_user_email');
+        document.getElementById('app-container').classList.add('hidden');
+        document.getElementById('auth-container').classList.remove('hidden');
+        window.mostraLogin();
     }
-}
+});
 
-// 2. INGREDIENTI BASE DI DEFAULT IN MAGAZZINO
-if (!localStorage.getItem('master_default_ingredienti')) {
-    const defaultIngredienti = [
-        { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
-        { id: 2, nome: "Zucchero Saccarosio", cat: "Zuccheri", qta: 50, min: 20, prezzo: 1.40 },
-        { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 },
-        { id: 4, nome: "Miscela Base Pastorizzata", cat: "Semilavorati", qta: 0, min: 10, prezzo: 0.00 }
-    ];
-    localStorage.setItem('master_default_ingredienti', JSON.stringify(defaultIngredienti));
-}
+// GESTORE ACCESSO (LOGIN)
+document.getElementById('login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-password').value;
+    
+    try {
+        await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error) {
+        console.error(error);
+        alert("⚠️ Email o Password errate o utente non esistente sul Cloud.");
+    }
+});
 
-// 3. INIEZIONE FORZATA RICETTA PASTORIZZATA DI DEFAULT PER ADMIN E UTENTI
-const KEY_RICETTE_ADMIN = "ricette_admin@gelateria.com";
-let ricetteAdmin = JSON.parse(localStorage.getItem(KEY_RICETTE_ADMIN)) || [];
-if (!ricetteAdmin.some(r => r.id === 999999 || r.nome === "Miscela Base Pastorizzata")) {
-    ricetteAdmin.unshift({
-        id: 999999,
-        nome: "Miscela Base Pastorizzata",
-        tipo: "Semilavorato",
-        blindata: true,
-        pesoTotale: 1.000,
-        ingredienti: [
-            { nome: "Latte Intero Alta Qualità", quantita: 0.700, prezzo: 1.10 },
-            { nome: "Zucchero Saccarosio", quantita: 0.150, prezzo: 1.40 },
-            { nome: "Panna Fresca 35%", quantita: 0.150, prezzo: 4.80 }
-        ]
-    });
-    localStorage.setItem(KEY_RICETTE_ADMIN, JSON.stringify(ricetteAdmin));
-}
+// GESTORE REGISTRAZIONE (REGISTRAZIONE CLOUD + INVENTARIO DI PARTENZA)
+document.getElementById('register-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const titolare = document.getElementById('reg-titolare').value.trim();
+    const gelateria = document.getElementById('reg-gelateria').value.trim();
+    const indirizzo = document.getElementById('reg-indirizzo').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const pass = document.getElementById('reg-password').value;
+    
+    if (pass.length < 6) {
+        alert("⚠️ Per motivi di sicurezza, la password deve contenere almeno 6 caratteri.");
+        return;
+    }
 
-let utenteCorrente = null;
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+        const user = userCredential.user;
 
-// Simulatore email globale
-window.simulaInvioEmail = function(titolo, messaggio) {
-    const box = document.getElementById('email-simulator-box');
-    const testo = document.getElementById('email-simulator-text');
-    if(box && testo) {
-        testo.innerHTML = `<strong>${titolo}</strong><br><br>${messaggio}`;
-        box.classList.remove('hidden');
+        const isAdmin = email === "admin@gelateria.com";
+
+        // Crea anagrafica su Firestore
+        await setDoc(doc(db, "utenti", user.uid), {
+            uid: user.uid,
+            email: email,
+            nome: titolare,
+            gelateria: gelateria,
+            indirizzo: indirizzo,
+            ruolo: isAdmin ? "Amministratore" : "Operatore",
+            approvato: isAdmin ? true : false
+        });
+
+        // Crea magazzino di base online per questo utente
+        const defaultIngredienti = [
+            { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
+            { id: 2, nome: "Zucchero Saccarosio", cat: "Zuccheri", qta: 50, min: 20, prezzo: 1.40 },
+            { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 },
+            { id: 4, nome: "Miscela Base Pastorizzata", cat: "Semilavorati", qta: 0, min: 10, prezzo: 0.00 }
+        ];
+
+        await setDoc(doc(db, "magazzini", user.uid), { articoli: defaultIngredienti });
+
+        alert(isAdmin ? "🎉 Admin configurato con successo sul Cloud!" : "🎉 Richiesta inviata sul Cloud! Profilo in attesa di approvazione.");
+        
+        document.getElementById('register-form').reset();
+        await signOut(auth);
+        window.mostraLogin();
+
+    } catch (error) {
+        console.error(error);
+        alert("⚠️ Errore durante la registrazione Cloud: " + error.message);
+    }
+});
+
+// GESTORE USCITA (LOGOUT)
+window.logout = async function() {
+    try {
+        await signOut(auth);
+    } catch (error) {
+        console.error("Errore durante il logout:", error);
     }
 };
 
+// ==========================================
+// 3. INTERFACCIA E NAVIGAZIONE DINAMICA
+// ==========================================
 window.mostraRegistrazione = function() {
     document.getElementById('box-login').classList.add('hidden');
     document.getElementById('box-register').classList.remove('hidden');
@@ -80,112 +170,6 @@ window.mostraLogin = function() {
     document.getElementById('box-login').classList.remove('hidden');
 };
 
-// 4. GESTORE ACCESSO (LOGIN)
-document.getElementById('login-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
-    const pass = document.getElementById('login-password').value;
-    
-    const utenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
-    const utente = utenti.find(u => u.email === email && u.pass === pass);
-    
-    if (utente) {
-        if (!utente.approvato) {
-            alert("⚠️ Il tuo account è in fase di revisione. Riceverai una mail non appena Saimon approverà la tua richiesta!");
-            return;
-        }
-        
-        utenteCorrente = utente;
-        localStorage.setItem('current_user_email', utente.email); // Assicura la sincronizzazione delle chiavi
-        
-        // Forza l'iniezione della ricetta anche per i nuovi utenti operai al momento del loro primo login
-        const KEY_RICETTE_UTENTE = `ricette_${utente.email}`;
-        let ricetteUtente = JSON.parse(localStorage.getItem(KEY_RICETTE_UTENTE)) || [];
-        if (!ricetteUtente.some(r => r.id === 999999 || r.nome === "Miscela Base Pastorizzata")) {
-            ricetteUtente.unshift({
-                id: 999999,
-                nome: "Miscela Base Pastorizzata",
-                tipo: "Semilavorato",
-                blindata: true,
-                pesoTotale: 1.000,
-                ingredienti: [
-                    { nome: "Latte Intero Alta Qualità", quantita: 0.700, prezzo: 1.10 },
-                    { nome: "Zucchero Saccarosio", quantita: 0.150, prezzo: 1.40 },
-                    { nome: "Panna Fresca 35%", quantita: 0.150, prezzo: 4.80 }
-                ]
-            });
-            localStorage.setItem(KEY_RICETTE_UTENTE, JSON.stringify(ricetteUtente));
-        }
-
-        document.getElementById('auth-container').classList.add('hidden');
-        document.getElementById('app-container').classList.remove('hidden');
-        
-        document.getElementById('user-display').innerText = utente.nome;
-        document.getElementById('role-display').innerText = utente.ruolo;
-        
-        const btnConsole = document.getElementById('btn-console');
-        if (btnConsole) {
-            if (utente.ruolo === "Amministratore") {
-                btnConsole.classList.remove('hidden');
-            } else {
-                btnConsole.classList.add('hidden');
-            }
-        }
-        
-        window.navigaA('magazzino');
-    } else {
-        alert("⚠️ Email o Password errate.");
-    }
-});
-
-// 5. GESTORE REGISTRAZIONE
-document.getElementById('register-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const titolare = document.getElementById('reg-titolare').value.trim();
-    const gelateria = document.getElementById('reg-gelateria').value.trim();
-    const indirizzo = document.getElementById('reg-indirizzo').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const pass = document.getElementById('reg-password').value;
-    
-    if (pass.length < 4) {
-        alert("⚠️ La password deve contenere almeno 4 caratteri.");
-        return;
-    }
-
-    let utenti = JSON.parse(localStorage.getItem('erp_utenti')) || [];
-    if (utenti.some(u => u.email === email)) {
-        alert("⚠️ Email già registrata.");
-        return;
-    }
-
-    utenti.push({ 
-        email: email, pass: pass, nome: titolare, gelateria: gelateria, indirizzo: indirizzo, 
-        ruolo: "Operatore", approvato: false 
-    });
-    localStorage.setItem('erp_utenti', JSON.stringify(utenti));
-
-    alert("🎉 Richiesta inviata! Profilo in attesa di approvazione da parte di Saimon.");
-    document.getElementById('register-form').reset();
-    window.mostraLogin();
-
-    setTimeout(() => {
-        window.simulaInvioEmail("📧 Email inviata a: " + email, "Ciao " + titolare + ", richiesta ricevuta per <strong>" + gelateria + "</strong>. In attesa di approvazione.");
-    }, 1500);
-
-    setTimeout(() => {
-        window.simulaInvioEmail("📧 Richiesta per: Saimon Admin", "Nuova gelateria da verificare:<br><strong>" + gelateria + "</strong> (" + titolare + "). Controlla la Console Master.");
-    }, 4500);
-});
-
-window.logout = function() {
-    utenteCorrente = null;
-    localStorage.removeItem('current_user_email');
-    document.getElementById('app-container').classList.add('hidden');
-    document.getElementById('auth-container').classList.remove('hidden');
-    window.mostraLogin();
-};
-
-// 6. CARICAMENTO MODULI ASINCRONI
 window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico');
     if (!contenitore) return;
@@ -201,6 +185,7 @@ window.navigaA = async function(sezione) {
 
         const nuovoScript = document.createElement('script');
         nuovoScript.id = 'script-sezione';
+        nuovoScript.type = 'module'; // Fondamentale per i sottomoduli
         nuovoScript.src = `sezioni/${sezione}/${sezione}.js?v=${new Date().getTime()}`;
         document.body.appendChild(nuovoScript);
     } catch (error) {
