@@ -54,18 +54,16 @@ async function navigaA(sezione) {
     document.getElementById(`btn-${sezione}`).classList.remove('text-slate-400');
 
     try {
-        // Carica il pezzo di HTML corrispondente
+        // Rimosso il punto iniziale per rendere il percorso compatibile al 100% con GitHub Pages
         const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
         if(!risposta.ok) throw new Error("Errore nel caricamento del modulo");
         const html = await risposta.text();
         
         contenitore.innerHTML = html;
 
-        // Elimina script vecchi per non creare conflitti in memoria
         const vecchioScript = document.getElementById('script-sezione');
         if(vecchioScript) vecchioScript.remove();
 
-        // Inietta lo script javascript specifico della sezione
         const nuovoScript = document.createElement('script');
         nuovoScript.id = 'script-sezione';
         nuovoScript.src = `sezioni/${sezione}/${sezione}.js?v=${new Date().getTime()}`;
