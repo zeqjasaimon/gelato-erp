@@ -6,7 +6,7 @@ try {
     databaseUtenti = [];
 }
 
-// Forza la presenza dell'account di Saimon Admin sbloccato
+// Garantisce i privilegi dell'Admin Master ad ogni avvio
 let adminTrovato = databaseUtenti.find(u => u.email === "admin@gelateria.com");
 if (!adminTrovato) {
     databaseUtenti.push({
@@ -28,14 +28,34 @@ if (!adminTrovato) {
     }
 }
 
-// 2. INGREDIENTI BASE DI DEFAULT
+// 2. INGREDIENTI BASE DI DEFAULT IN MAGAZZINO
 if (!localStorage.getItem('master_default_ingredienti')) {
     const defaultIngredienti = [
         { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
         { id: 2, nome: "Zucchero Saccarosio", cat: "Zuccheri", qta: 50, min: 20, prezzo: 1.40 },
-        { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 }
+        { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 },
+        { id: 4, nome: "Miscela Base Pastorizzata", cat: "Semilavorati", qta: 0, min: 10, prezzo: 0.00 }
     ];
     localStorage.setItem('master_default_ingredienti', JSON.stringify(defaultIngredienti));
+}
+
+// 3. INIEZIONE FORZATA RICETTA PASTORIZZATA DI DEFAULT PER ADMIN E UTENTI
+const KEY_RICETTE_ADMIN = "ricette_admin@gelateria.com";
+let ricetteAdmin = JSON.parse(localStorage.getItem(KEY_RICETTE_ADMIN)) || [];
+if (!ricetteAdmin.some(r => r.id === 999999 || r.nome === "Miscela Base Pastorizzata")) {
+    ricetteAdmin.unshift({
+        id: 999999,
+        nome: "Miscela Base Pastorizzata",
+        tipo: "Semilavorato",
+        blindata: true,
+        pesoTotale: 1.000,
+        ingredienti: [
+            { nome: "Latte Intero Alta Qualità", quantita: 0.700, prezzo: 1.10 },
+            { nome: "Zucchero Saccarosio", quantita: 0.150, prezzo: 1.40 },
+            { nome: "Panna Fresca 35%", quantita: 0.150, prezzo: 4.80 }
+        ]
+    });
+    localStorage.setItem(KEY_RICETTE_ADMIN, JSON.stringify(ricetteAdmin));
 }
 
 let utenteCorrente = null;
@@ -60,7 +80,7 @@ window.mostraLogin = function() {
     document.getElementById('box-login').classList.remove('hidden');
 };
 
-// 3. GESTORE ACCESSO (LOGIN)
+// 4. GESTORE ACCESSO (LOGIN)
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
@@ -76,6 +96,27 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
         }
         
         utenteCorrente = utente;
+        localStorage.setItem('current_user_email', utente.email); // Assicura la sincronizzazione delle chiavi
+        
+        // Forza l'iniezione della ricetta anche per i nuovi utenti operai al momento del loro primo login
+        const KEY_RICETTE_UTENTE = `ricette_${utente.email}`;
+        let ricetteUtente = JSON.parse(localStorage.getItem(KEY_RICETTE_UTENTE)) || [];
+        if (!ricetteUtente.some(r => r.id === 999999 || r.nome === "Miscela Base Pastorizzata")) {
+            ricetteUtente.unshift({
+                id: 999999,
+                nome: "Miscela Base Pastorizzata",
+                tipo: "Semilavorato",
+                blindata: true,
+                pesoTotale: 1.000,
+                ingredienti: [
+                    { nome: "Latte Intero Alta Qualità", quantita: 0.700, prezzo: 1.10 },
+                    { nome: "Zucchero Saccarosio", quantita: 0.150, prezzo: 1.40 },
+                    { nome: "Panna Fresca 35%", quantita: 0.150, prezzo: 4.80 }
+                ]
+            });
+            localStorage.setItem(KEY_RICETTE_UTENTE, JSON.stringify(ricetteUtente));
+        }
+
         document.getElementById('auth-container').classList.add('hidden');
         document.getElementById('app-container').classList.remove('hidden');
         
@@ -97,7 +138,7 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     }
 });
 
-// 4. GESTORE REGISTRAZIONE
+// 5. GESTORE REGISTRAZIONE
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const titolare = document.getElementById('reg-titolare').value.trim();
@@ -127,7 +168,6 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
     document.getElementById('register-form').reset();
     window.mostraLogin();
 
-    // Trigger Email 1 e 2
     setTimeout(() => {
         window.simulaInvioEmail("📧 Email inviata a: " + email, "Ciao " + titolare + ", richiesta ricevuta per <strong>" + gelateria + "</strong>. In attesa di approvazione.");
     }, 1500);
@@ -139,12 +179,13 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
 
 window.logout = function() {
     utenteCorrente = null;
+    localStorage.removeItem('current_user_email');
     document.getElementById('app-container').classList.add('hidden');
     document.getElementById('auth-container').classList.remove('hidden');
     window.mostraLogin();
 };
 
-// 5. CARICAMENTO MODULI ASINCRONI
+// 6. CARICAMENTO MODULI ASINCRONI
 window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico');
     if (!contenitore) return;
