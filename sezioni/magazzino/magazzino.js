@@ -7,12 +7,10 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
     let idArticoloInModifica = null;
 
     function getUidUtente() {
-        if (auth && auth.currentUser) {
-            return auth.currentUser.uid;
-        }
-        return null;
+        return auth && auth.currentUser ? auth.currentUser.uid : null;
     }
 
+    // INIZIALIZZA IL MAGAZZINO CLOUD
     async function inizializzaMagazzino() {
         idArticoloInModifica = null;
         const uid = getUidUtente();
@@ -22,6 +20,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             return;
         }
 
+        // Reset del form se presente nella tua modale originale
         const form = document.getElementById('form-aggiungi-mp');
         if (form) form.reset();
         
@@ -31,6 +30,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         await renderTabellaMagazzino();
     }
 
+    // FUNZIONE PER SCARICARE I DATI DA FIREBASE
     async function ottieniArticoliCloud(uid) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -44,6 +44,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         return [];
     }
 
+    // FUNZIONE PER SALVARE I DATI SU FIREBASE
     async function salvaArticoliCloud(uid, articoli) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -54,6 +55,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     }
 
+    // AGGANCIO AL FORM DI INSERIMENTO ORIGINALE
     const formMp = document.getElementById('form-aggiungi-mp');
     if (formMp) {
         const nuovoForm = formMp.cloneNode(true);
@@ -64,6 +66,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const uid = getUidUtente();
             if (!uid) return;
 
+            // Mappatura flessibile degli ID per essere sicuri al 100% di leggere i tuoi campi
             const elNome = document.getElementById('mp-nome') || document.getElementById('nome');
             const elCat = document.getElementById('mp-categoria') || document.getElementById('categoria');
             const elQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta') || document.getElementById('giacenza');
@@ -77,13 +80,14 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const prezzo = elPrezzo ? (parseFloat(elPrezzo.value) || 0) : 0;
 
             if (!nome) {
-                alert("⚠️ Inserisci il nome dell'ingrediente.");
+                alert("⚠️ Inserisci almeno il nome dell'ingrediente.");
                 return;
             }
 
             let inventario = await ottieniArticoliCloud(uid);
 
             if (idArticoloInModifica !== null) {
+                // MODALITÀ MODIFICA
                 let indice = inventario.findIndex(item => item.id === idArticoloInModifica);
                 if (indice !== -1) {
                     inventario[indice].nome = nome;
@@ -94,35 +98,54 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                     alert(`🎉 Ingrediente "${nome}" aggiornato sul Cloud!`);
                 }
             } else {
+                // MODALITÀ NUOVO
                 if (inventario.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
                     alert("⚠️ Un ingrediente con questo nome è già presente in magazzino.");
                     return;
                 }
 
-                inventario.push({
-                    id: Date.now(),
-                    nome: nome,
-                    cat: cat,
-                    qta: qta,
-                    min: min,
-                    prezzo: prezzo
-                });
+                inventario.push({ id: Date.now(), nome, cat, qta, min, prezzo });
                 alert(`🎉 Nuovo ingrediente "${nome}" salvato sul Cloud!`);
             }
 
             await salvaArticoliCloud(uid, inventario);
-            inizializzaMagazzino();
+            
+            // Chiude la modale se presente nel tuo HTML originale
+            const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
+            if (modal) modal.classList.add('hidden');
+            
+            await inizializzaMagazzino();
         });
     }
 
+    // FUNZIONE RICHIESTA DAL TUO PULSANTE ORIGINALE NEL FILE HTML
     window.apriModalMateria = function() {
-        const inputNome = document.getElementById('mp-nome') || document.getElementById('nome');
-        if (inputNome) {
-            inputNome.scrollIntoView({ behavior: 'smooth' });
-            inputNome.focus();
+        idArticoloInModifica = null;
+        const form = document.getElementById('form-aggiungi-mp');
+        if (form) form.reset();
+
+        const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
+        if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
+
+        // Mostra la finestra modale originale impostata nel tuo HTML
+        const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
+        if (modal) {
+            modal.classList.remove('hidden');
+        } else {
+            // Se non trova la modale per qualche motivo, fa lo scroll al form per sicurezza
+            const inputNome = document.getElementById('mp-nome') || document.getElementById('nome');
+            if (inputNome) inputNome.focus();
         }
     };
 
+    // FUNZIONE PER CHIUDERE LA FINESTRA
+    window.chiudiModalMateria = function() {
+        const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
+        if (modal) modal.classList.add('hidden');
+        idArticoloInModifica = null;
+    };
+
+    // MODIFICA ARTICOLO ESISTENTE
     window.avviaModificaArticolo = async function(id) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -140,17 +163,20 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         const elPrezzo = document.getElementById('mp-prezzo') || document.getElementById('prezzo');
 
         if (elNome) elNome.value = articolo.nome;
-        if (elCat) elCat.value = articolo.cat || 'Base Liquida';
+        if (elCat) elCat.value = articolo.cat || 'Generico';
         if (elQta) elQta.value = articolo.qta;
-        if (elMin) elMin.value = articolo.min;
+        if (elMin) elMin.value = articolo.min || 0;
         if (elPrezzo) elPrezzo.value = articolo.prezzo;
 
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "🔄 Aggiorna Articolo";
 
+        const modal = document.getElementById('modal-materia') || document.getElementById('modal-ingrediente');
+        if (modal) modal.classList.remove('hidden');
         if (elNome) elNome.focus();
     };
 
+    // MOVIMENTO RAPIDO DI CARICO/SCARICO SUL CLOUD
     window.aggiornaGiacenzaRapida = async function(id) {
         const uid = getUidUtente();
         const input = document.getElementById(`rapido-${id}`);
@@ -170,6 +196,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     };
 
+    // ELIMINA ARTICOLO DAL CLOUD
     window.eliminaArticoloMagazzino = async function(id, nome) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -180,9 +207,10 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         inventario = inventario.filter(i => i.id !== id);
         
         await salvaArticoliCloud(uid, inventario);
-        inizializzaMagazzino();
+        await renderTabellaMagazzino();
     };
 
+    // RENDERING DELLA TABELLA CON I DATI IN TEMPO REALE E AGGIORNAMENTO CONTATORI
     async function renderTabellaMagazzino() {
         const uid = getUidUtente();
         if (!uid) return;
@@ -193,36 +221,42 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
 
         tbody.innerHTML = "";
 
+        let contatoreSottoScorta = 0;
+        let valoreTotaleMagazzino = 0;
+
         if (inventario.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Il tuo magazzino è vuoto. Inserisci il primo ingrediente a sinistra.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Il tuo magazzino Cloud è vuoto. Clicca su "Inserisci Ingrediente" in alto.</td></tr>`;
+            if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = "0";
+            if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = "0";
+            if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = "€ 0.00";
             return;
         }
 
         inventario.forEach(item => {
             const sottoSoglia = item.qta <= (item.min || 0);
+            if (sottoSoglia) contatoreSottoScorta++;
+            valoreTotaleMagazzino += (item.qta * item.prezzo);
+
             const rigaAllarmeClass = sottoSoglia ? 'bg-rose-500/5 hover:bg-rose-500/10' : 'hover:bg-slate-800/20';
             const badgeSottoSoglia = sottoSoglia ? `<span class="ml-2 text-[9px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 px-1.5 py-0.5 rounded uppercase">Scorta Minima</span>` : '';
 
             tbody.innerHTML += `
                 <tr class="text-slate-300 border-b border-slate-800/60 text-xs ${rigaAllarmeClass}">
-                    <td class="p-3">
+                    <td class="p-4">
                         <span class="font-bold text-white text-sm">${item.nome}</span> ${badgeSottoSoglia}
-                        <p class="text-[10px] text-slate-500 mt-0.5 uppercase tracking-wider font-semibold">${item.cat || 'Generico'}</p>
                     </td>
-                    <td class="p-3 font-mono text-right text-sm ${sottoSoglia ? 'text-rose-400 font-bold' : 'text-sky-400 font-semibold'}">${(item.qta || 0).toFixed(2)} kg</td>
-                    <td class="p-3 font-mono text-right text-slate-400">${(item.min || 0).toFixed(1)} kg</td>
-                    <td class="p-3 font-mono text-right text-emerald-400 font-medium">€ ${(item.prezzo || 0).toFixed(2)}</td>
-                    
-                    <td class="p-3 text-center">
+                    <td class="p-4 uppercase text-slate-400 font-semibold tracking-wider text-[10px]">${item.cat || 'Generico'}</td>
+                    <td class="p-4 font-mono text-right text-sm ${sottoSoglia ? 'text-rose-400 font-bold' : 'text-sky-400 font-semibold'}">${(item.qta || 0).toFixed(2)} kg</td>
+                    <td class="p-4 font-mono text-right text-emerald-400 font-medium">€ ${(item.prezzo || 0).toFixed(2)}</td>
+                    <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-1 max-w-[120px] mx-auto">
-                            <input type="number" id="rapido-${item.id}" placeholder="± Kg" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs text-white focus:outline-none focus:border-indigo-500">
+                            <input type="number" id="rapido-${item.id}" placeholder="± Kg" class="w-14 bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-center text-xs text-white focus:outline-none">
                             <button onclick="aggiornaGiacenzaRapida(${item.id})" class="bg-slate-800 hover:bg-slate-700 text-slate-200 p-1 rounded transition cursor-pointer">
                                 <i class="fa-solid fa-square-plus text-sm"></i>
                             </button>
                         </div>
                     </td>
-                    
-                    <td class="p-3 text-center">
+                    <td class="p-4 text-center">
                         <div class="flex items-center justify-center gap-2">
                             <button onclick="avviaModificaArticolo(${item.id})" class="text-slate-400 hover:text-sky-400 p-1.5 transition cursor-pointer">
                                 <i class="fa-solid fa-pen-to-square text-sm"></i>
@@ -235,6 +269,11 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                 </tr>
             `;
         });
+
+        // Aggiorna le tre etichette riassuntive in alto
+        if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = inventario.length;
+        if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = contatoreSottoScorta;
+        if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = `€ ${valoreTotaleMagazzino.toFixed(2)}`;
     }
 
     setTimeout(inizializzaMagazzino, 400);
