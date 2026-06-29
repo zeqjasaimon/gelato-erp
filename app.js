@@ -1,194 +1,139 @@
-// ==========================================
-// 1. IMPORTAZIONE MODULI FIREBASE (CLOUD)
-// ==========================================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { 
-    getAuth, 
-    createUserWithEmailAndPassword, 
-    signInWithEmailAndPassword, 
-    signOut, 
-    onAuthStateChanged 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { 
-    getFirestore, 
-    doc, 
-    setDoc, 
-    getDoc 
-} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// ========================================================
+// REPERTO SINCRO CLOUD PER SEZIONE MAGAZZINO (BLINDATO)
+// ========================================================
+import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// La tua configurazione ufficiale salvata su Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyDAVkzzL0oaEZ0ajP7ol-8WtwbXOSMFRR4",
-  authDomain: "gelateria-erp.firebaseapp.com",
-  projectId: "gelateria-erp",
-  storageBucket: "gelateria-erp.firebasestorage.app",
-  messagingSenderId: "614362128350",
-  appId: "1:614362128350:web:00dc0d950061a8274a874f",
-  measurementId: "G-E0ZRTLQL6E"
+let idArticoloInModifica = null;
+
+window.apriModalMateria = function() {
+    idArticoloInModifica = null;
+    const form = document.getElementById('form-aggiungi-mp');
+    if (form) form.reset();
+    
+    const mt = document.getElementById('modal-titolo');
+    if (mt) mt.innerText = "💾 Inserisci Nuovo Ingrediente";
+    
+    const modal = document.getElementById('modal-materia');
+    if (modal) modal.classList.remove('hidden');
 };
 
-// Inizializzazione dei servizi Cloud
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+window.chiudiModalMateria = function() {
+    const modal = document.getElementById('modal-materia');
+    if (modal) modal.classList.add('hidden');
+    idArticoloInModifica = null;
+};
 
-// Rendiamo i servizi accessibili anche agli altri file (.js) delle sezioni
-window.fbAuth = auth;
-window.fbDb = db;
+async function ricaricaTabellaMagazzinoCloud() {
+    if (!window.fbAuth || !window.fbAuth.currentUser) return;
+    const uid = window.fbAuth.currentUser.uid;
+    const tbody = document.getElementById('tabella-magazzino');
+    if (!tbody) return;
 
-// ==========================================
-// 2. LOGICA DI CONTROLLO ACCESSO (AUTH LOOPS)
-// ==========================================
+    try {
+        const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
+        const inventario = docSnap.exists() ? (docSnap.data().articoli || []) : [];
+        
+        tbody.innerHTML = "";
+        let sottoScorta = 0;
+        let valoreTotale = 0;
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        const docRef = doc(db, "utenti", user.uid);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-            const datiUtente = docSnap.data();
-
-            if (!datiUtente.approvato) {
-                alert("⚠️ Il tuo account è in fase di revisione. Riceverai una mail non appena Saimon approverà la tua richiesta!");
-                await signOut(auth);
-                return;
-            }
-
-            localStorage.setItem('current_user_email', datiUtente.email);
-
-            document.getElementById('auth-container').classList.add('hidden');
-            document.getElementById('app-container').classList.remove('hidden');
-            
-            document.getElementById('user-display').innerText = datiUtente.nome;
-            document.getElementById('role-display').innerText = datiUtente.ruolo;
-            
-            const btnConsole = document.getElementById('btn-console');
-            if (btnConsole) {
-                if (datiUtente.ruolo === "Amministratore") {
-                    btnConsole.classList.remove('hidden');
-                } else {
-                    btnConsole.classList.add('hidden');
-                }
-            }
-            
-            window.navigaA('magazzino');
+        if (inventario.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500 italic">Il tuo magazzino Cloud è vuoto. Premi il pulsante in alto per iniziare.</td></tr>`;
+            return;
         }
-    } else {
-        localStorage.removeItem('current_user_email');
-        document.getElementById('app-container').classList.add('hidden');
-        document.getElementById('auth-container').classList.remove('hidden');
-        window.mostraLogin();
-    }
-});
 
-// GESTORE ACCESSO (LOGIN)
-document.getElementById('login-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
-    const pass = document.getElementById('login-password').value;
-    
-    try {
-        await signInWithEmailAndPassword(auth, email, pass);
-    } catch (error) {
-        console.error(error);
-        alert("⚠️ Email o Password errate o utente non esistente sul Cloud.");
-    }
-});
+        inventario.forEach(item => {
+            const isSotto = item.qta <= (item.min || 0);
+            if (isSotto) sottoScorta++;
+            valoreTotale += (item.qta * item.prezzo);
 
-// GESTORE REGISTRAZIONE (REGISTRAZIONE CLOUD + INVENTARIO DI PARTENZA)
-document.getElementById('register-form').addEventListener('submit', async function(e) {
-    e.preventDefault();
-    const titolare = document.getElementById('reg-titolare').value.trim();
-    const gelateria = document.getElementById('reg-gelateria').value.trim();
-    const indirizzo = document.getElementById('reg-indirizzo').value.trim();
-    const email = document.getElementById('reg-email').value.trim();
-    const pass = document.getElementById('reg-password').value;
-    
-    if (pass.length < 6) {
-        alert("⚠️ Per motivi di sicurezza, la password deve contenere almeno 6 caratteri.");
-        return;
-    }
+            const bgRow = isSotto ? 'bg-rose-500/5' : '';
+            const badge = isSotto ? `<span class="px-2 py-0.5 text-[9px] bg-rose-500/10 text-rose-400 border border-rose-500/20 rounded">SOTTO SCORTA</span>` : `<span class="px-2 py-0.5 text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded">OK</span>`;
 
-    try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-        const user = userCredential.user;
-
-        const isAdmin = email === "admin@gelateria.com";
-
-        // Crea anagrafica su Firestore
-        await setDoc(doc(db, "utenti", user.uid), {
-            uid: user.uid,
-            email: email,
-            nome: titolare,
-            gelateria: gelateria,
-            indirizzo: indirizzo,
-            ruolo: isAdmin ? "Amministratore" : "Operatore",
-            approvato: isAdmin ? true : false
+            tbody.innerHTML += `
+                <tr class="text-slate-300 border-b border-slate-800/60 text-xs ${bgRow} hover:bg-slate-800/10">
+                    <td class="p-4 font-bold text-white text-sm">${item.nome}</td>
+                    <td class="p-4 uppercase text-slate-400 tracking-wider text-[10px]">${item.cat || 'Generico'}</td>
+                    <td class="p-4 font-mono text-right text-sm ${isSotto ? 'text-rose-400 font-bold' : 'text-sky-400'}">${item.qta.toFixed(2)} kg</td>
+                    <td class="p-4 font-mono text-right text-emerald-400">€ ${item.prezzo.toFixed(2)}</td>
+                    <td class="p-4 text-center">${badge}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="window.avviaModificaMagazzino(${item.id})" class="text-slate-400 hover:text-sky-400 p-1 cursor-pointer"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button onclick="window.eliminaArticoloMagazzinoCloud(${item.id}, '${item.nome}')" class="text-slate-500 hover:text-rose-400 p-1 ml-2 cursor-pointer"><i class="fa-regular fa-trash-can"></i></button>
+                    </td>
+                </tr>
+            `;
         });
 
-        // Crea magazzino di base online per questo utente
-        const defaultIngredienti = [
-            { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
-            { id: 2, nome: "Zucchero Saccarosio", cat: "Zuccheri", qta: 50, min: 20, prezzo: 1.40 },
-            { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 },
-            { id: 4, nome: "Miscela Base Pastorizzata", cat: "Semilavorati", qta: 0, min: 10, prezzo: 0.00 }
-        ];
+        if(document.getElementById('tot-ingredienti')) document.getElementById('tot-ingredienti').innerText = inventario.length;
+        if(document.getElementById('tot-sottoscorta')) document.getElementById('tot-sottoscorta').innerText = sottoScorta;
+        if(document.getElementById('valore-magazzino')) document.getElementById('valore-magazzino').innerText = `€ ${valoreTotale.toFixed(2)}`;
 
-        await setDoc(doc(db, "magazzini", user.uid), { articoli: defaultIngredienti });
+        // Configura il form al volo quando la pagina viene renderizzata
+        const form = document.getElementById('form-aggiungi-mp');
+        if (form) {
+            form.onsubmit = async function(e) {
+                e.preventDefault();
+                const nome = document.getElementById('mp-nome').value.trim();
+                const cat = document.getElementById('mp-categoria').value;
+                const qta = parseFloat(document.getElementById('mp-quantita').value) || 0;
+                const min = parseFloat(document.getElementById('mp-scorta').value) || 0;
+                const prezzo = parseFloat(document.getElementById('mp-prezzo').value) || 0;
 
-        alert(isAdmin ? "🎉 Admin configurato con successo sul Cloud!" : "🎉 Richiesta inviata sul Cloud! Profilo in attesa di approvazione.");
-        
-        document.getElementById('register-form').reset();
-        await signOut(auth);
-        window.mostraLogin();
+                const docRef = doc(window.fbDb, "magazzini", uid);
+                const snap = await getDoc(docRef);
+                let inv = snap.exists() ? (snap.data().articoli || []) : [];
 
-    } catch (error) {
-        console.error(error);
-        alert("⚠️ Errore durante la registrazione Cloud: " + error.message);
+                if (idArticoloInModifica !== null) {
+                    let idx = inv.findIndex(i => i.id === idArticoloInModifica);
+                    if(idx !== -1) inv[idx] = { id: idArticoloInModifica, nome, cat, qta, min, prezzo };
+                } else {
+                    inv.push({ id: Date.now(), nome, cat, qta, min, prezzo });
+                }
+
+                await setDoc(docRef, { articoli: inv });
+                window.chiudiModalMateria();
+                ricaricaTabellaMagazzinoCloud();
+            };
+        }
+
+    } catch (e) { console.error(e); }
+}
+
+window.avviaModificaMagazzino = async function(id) {
+    if (!window.fbAuth || !window.fbAuth.currentUser) return;
+    const uid = window.fbAuth.currentUser.uid;
+    const docSnap = await getDoc(doc(window.fbDb, "magazzini", uid));
+    const item = docSnap.data().articoli.find(i => i.id === id);
+    if (!item) return;
+
+    idArticoloInModifica = id;
+    document.getElementById('mp-nome').value = item.nome;
+    document.getElementById('mp-categoria').value = item.cat || 'Generico';
+    document.getElementById('mp-quantita').value = item.qta;
+    document.getElementById('mp-scorta').value = item.min || 0;
+    document.getElementById('mp-prezzo').value = item.prezzo;
+
+    document.getElementById('modal-titolo').innerText = "🔄 Modifica Ingrediente";
+    document.getElementById('modal-materia').classList.remove('hidden');
+};
+
+window.eliminaArticoloMagazzinoCloud = async function(id, nome) {
+    if (!window.fbAuth || !window.fbAuth.currentUser) return;
+    const uid = window.fbAuth.currentUser.uid;
+    if (!confirm(`Eliminare ${nome}?`)) return;
+    
+    const docRef = doc(window.fbDb, "magazzini", uid);
+    const docSnap = await getDoc(docRef);
+    const nuovo = docSnap.data().articoli.filter(i => i.id !== id);
+    await setDoc(docRef, { articoli: nuovo });
+    ricaricaTabellaMagazzinoCloud();
+};
+
+// Guardiano costante: se la tabella del magazzino appare a schermo vuota, la popola all'istante
+setInterval(() => {
+    const tbody = document.getElementById('tabella-magazzino');
+    if (tbody && tbody.children.length <= 1) {
+        ricaricaTabellaMagazzinoCloud();
     }
-});
-
-// GESTORE USCITA (LOGOUT)
-window.logout = async function() {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        console.error("Errore durante il logout:", error);
-    }
-};
-
-// ==========================================
-// 3. INTERFACCIA E NAVIGAZIONE DINAMICA
-// ==========================================
-window.mostraRegistrazione = function() {
-    document.getElementById('box-login').classList.add('hidden');
-    document.getElementById('box-register').classList.remove('hidden');
-};
-
-window.mostraLogin = function() {
-    document.getElementById('box-register').classList.add('hidden');
-    document.getElementById('box-login').classList.remove('hidden');
-};
-
-window.navigaA = async function(sezione) {
-    const contenitore = document.getElementById('contenuto-dinamico');
-    if (!contenitore) return;
-
-    try {
-        const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
-        if(!risposta.ok) throw new Error("File non trovato");
-        const html = await risposta.text();
-        contenitore.innerHTML = html;
-
-        const vecchioScript = document.getElementById('script-sezione');
-        if(vecchioScript) vecchioScript.remove();
-
-        const nuovoScript = document.createElement('script');
-        nuovoScript.id = 'script-sezione';
-        nuovoScript.type = 'module'; // Fondamentale per i sottomoduli
-        nuovoScript.src = `sezioni/${sezione}/${sezione}.js?v=${new Date().getTime()}`;
-        document.body.appendChild(nuovoScript);
-    } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 rounded-lg">Errore di caricamento della sezione.</div>`;
-    }
-};
+}, 500);
