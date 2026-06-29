@@ -1,14 +1,23 @@
-// Inizializza l'archivio utenti in memoria se non esiste ancora
+// Inizializza l'archivio utenti e le configurazioni Master di default se non esistono
 if (!localStorage.getItem('erp_utenti')) {
     const utentiIniziali = [
-        { email: "admin@gelateria.com", pass: "master2027", nome: "Capo Laboratorio", ruolo: "Amministratore" }
+        { email: "admin@gelateria.com", pass: "master2027", nome: "Simone Admin", ruolo: "Amministratore" }
     ];
     localStorage.setItem('erp_utenti', JSON.stringify(utentiIniziali));
 }
 
+// Ingredienti di default configurabili dal Super-Admin
+if (!localStorage.getItem('master_default_ingredienti')) {
+    const defaultIngredienti = [
+        { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
+        { id: 2, nome: "Zucchero Saccarosio", cat: "Zuccheri", qta: 50, min: 20, prezzo: 1.40 },
+        { id: 3, nome: "Panna Fresca 35%", cat: "Grassi", qta: 30, min: 15, prezzo: 4.80 }
+    ];
+    localStorage.setItem('master_default_ingredienti', JSON.stringify(defaultIngredienti));
+}
+
 let utenteCorrente = null;
 
-// Funzioni per scambiare visivamente i moduli Login / Registrazione
 window.mostraRegistrazione = function() {
     document.getElementById('box-login').classList.add('hidden');
     document.getElementById('box-register').classList.remove('hidden');
@@ -44,18 +53,28 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     if (utente) {
         utenteCorrente = utente;
         document.getElementById('auth-container').classList.add('hidden');
-        document.getElementById('app-container').classList.remove('hidden');
+        document.getElementById('app-dashboard' ? 'app-dashboard' : 'app-container').classList.remove('hidden');
         
         document.getElementById('user-display').innerText = utente.nome;
         document.getElementById('role-display').innerText = utente.ruolo;
         
-        navigaA('magazzino');
+        // Sblocca la Console Master se l'utente è l'Admin Master
+        const btnConsole = document.getElementById('btn-console');
+        if (btnConsole) {
+            if (utente.ruolo === "Amministratore") {
+                btnConsole.classList.remove('hidden');
+            } else {
+                btnConsole.classList.add('hidden');
+            }
+        }
+        
+        window.navigaA('magazzino');
     } else {
         mostraMessaggio("⚠️ Email o Password errate. Riprova.", "error");
     }
 });
 
-// GESTORE DELLA REGISTRAZIONE (Nuovo utente)
+// GESTORE DELLA REGISTRAZIONE
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const nome = document.getElementById('reg-nome').value.trim();
@@ -69,23 +88,24 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
 
     let utenti = JSON.parse(localStorage.getItem('erp_utenti'));
     
-    // Controlla se l'email esiste già
     if (utenti.some(u => u.email === email)) {
         mostraMessaggio("⚠️ Questo indirizzo email è già registrato.", "error");
         return;
     }
 
-    // Aggiungi il nuovo utente all'archivio
-    const nuovoUtente = { email, pass, nome, ruolo: "Amministratore" };
-    utenti.push(nuovoUtente);
+    // Registra l'utente come Operatore standard
+    utenti.push({ email, pass, nome, ruolo: "Operatore" });
     localStorage.setItem('erp_utenti', JSON.stringify(utenti));
 
-    mostraMessaggio("🎉 Registrazione completata! Ora puoi accedere.", "success");
+    // Carica il catalogo impostato dal Super-Admin per inizializzare il magazzino privato del nuovo utente
+    const defaultIngredienti = JSON.parse(localStorage.getItem('master_default_ingredienti'));
+    localStorage.setItem('mp_inventario', JSON.stringify(defaultIngredienti));
+
+    mostraMessaggio("🎉 Registrazione completata! Pacchetto iniziale inserito.", "success");
     document.getElementById('register-form').reset();
     
-    // Rimanda al login dopo 2 secondi
     setTimeout(() => {
-        mostraLogin();
+        window.mostraLogin();
         document.getElementById('login-email').value = email;
     }, 2000);
 });
@@ -93,29 +113,27 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
 // FUNZIONE DI LOGOUT
 window.logout = function() {
     utenteCorrente = null;
-    document.getElementById('app-container').classList.add('hidden');
+    document.getElementById('app-dashboard' ? 'app-dashboard' : 'app-container').classList.add('hidden');
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('login-form').reset();
-    mostraLogin();
+    window.mostraLogin();
 };
 
-// ROUTER CENTRALE (Per il caricamento asincrono delle sezioni)
+// ROUTER CENTRALE ASINCRONO
 window.navigaA = async function(sezione) {
-    const contenitore = document.getElementById('contenuto-dinamico');
+    const contenitore = document.getElementById('contenuto-dinamico') || document.getElementById('main-content');
     if (!contenitore) return;
     
-    ['magazzino', 'ricette', 'produzione', 'analisi'].forEach(s => {
+    ['magazzino', 'ricette', 'produzione', 'analisi', 'console'].forEach(s => {
         const btn = document.getElementById(`btn-${s}`);
         if(btn) {
-            btn.classList.remove('bg-indigo-600', 'text-white');
-            btn.classList.add('text-slate-400');
+            btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer";
         }
     });
     
     const btnAttivo = document.getElementById(`btn-${sezione}`);
     if(btnAttivo) {
-        btnAttivo.classList.add('bg-indigo-600', 'text-white');
-        btnAttivo.classList.remove('text-slate-400');
+        btnAttivo.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-indigo-600 text-white transition cursor-pointer";
     }
 
     try {
@@ -134,6 +152,6 @@ window.navigaA = async function(sezione) {
         document.body.appendChild(nuovoScript);
 
     } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">Impossibile caricare il modulo ${sezione}. Assicurati che i file esistano su GitHub.</div>`;
+        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">Impossibile caricare il modulo ${sezione}. Assicurati che i file esistano su GitHub nella cartella corretta.</div>`;
     }
 };
