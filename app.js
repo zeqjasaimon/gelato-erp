@@ -1,12 +1,12 @@
-// Inizializza l'archivio utenti e le configurazioni Master di default se non esistono
+// Inizializza l'archivio utenti e l'admin se non esistono
 if (!localStorage.getItem('erp_utenti')) {
     const utentiIniziali = [
-        { email: "admin@gelateria.com", pass: "master2027", nome: "Simone Admin", ruolo: "Amministratore" }
+        { email: "admin@gelateria.com", pass: "master2027", nome: "Saimon Admin", ruolo: "Amministratore", approvato: true, gelateria: "Master HQ", indirizzo: "Arco, TN" }
     ];
     localStorage.setItem('erp_utenti', JSON.stringify(utentiIniziali));
 }
 
-// Ingredienti di default configurabili dal Super-Admin
+// Ingredienti di default
 if (!localStorage.getItem('master_default_ingredienti')) {
     const defaultIngredienti = [
         { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
@@ -18,33 +18,27 @@ if (!localStorage.getItem('master_default_ingredienti')) {
 
 let utenteCorrente = null;
 
+// Funzione globale per simulare le email a schermo
+window.simulaInvioEmail = function(titolo, messaggio) {
+    const box = document.getElementById('email-simulator-box');
+    const testo = document.getElementById('email-simulator-text');
+    if(box && testo) {
+        testo.innerHTML = `<strong>${titolo}</strong><br><br>${messaggio}`;
+        box.classList.remove('hidden');
+    }
+};
+
 window.mostraRegistrazione = function() {
     document.getElementById('box-login').classList.add('hidden');
     document.getElementById('box-register').classList.remove('hidden');
-    nascondiMessaggio();
 };
 
 window.mostraLogin = function() {
     document.getElementById('box-register').classList.add('hidden');
     document.getElementById('box-login').classList.remove('hidden');
-    nascondiMessaggio();
 };
 
-function mostraMessaggio(testo, tipo) {
-    const msg = document.getElementById('auth-message');
-    if(msg) {
-        msg.innerText = testo;
-        msg.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
-        msg.classList.add(tipo === 'error' ? 'text-red-400' : 'text-emerald-400');
-    }
-}
-
-function nascondiMessaggio() {
-    const msg = document.getElementById('auth-message');
-    if(msg) msg.classList.add('hidden');
-}
-
-// GESTORE DEL LOGIN
+// LOGIN CON CONTROLLO APPROVAZIONE
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const email = document.getElementById('login-email').value.trim();
@@ -54,104 +48,93 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     const utente = utenti.find(u => u.email === email && u.pass === pass);
     
     if (utente) {
+        if (!utente.approvato) {
+            alert("⚠️ Il tuo account è in fase di revisione. Riceverai una mail non appena Saimon approverà la tua richiesta!");
+            return;
+        }
+        
         utenteCorrente = utente;
-        
         document.getElementById('auth-container').classList.add('hidden');
+        document.getElementById('app-container').classList.remove('hidden');
         
-        const d1 = document.getElementById('app-container');
-        const d2 = document.getElementById('app-dashboard');
-        if(d1) d1.classList.remove('hidden');
-        if(d2) d2.classList.remove('hidden');
-        
-        const uDisp = document.getElementById('user-display');
-        const rDisp = document.getElementById('role-display');
-        if(uDisp) uDisp.innerText = utente.nome;
-        if(rDisp) rDisp.innerText = utente.ruolo;
+        document.getElementById('user-display').innerText = utente.nome;
+        document.getElementById('role-display').innerText = utente.ruolo;
         
         const btnConsole = document.getElementById('btn-console');
         if (btnConsole) {
-            if (utente.ruolo === "Amministratore") {
-                btnConsole.classList.remove('hidden');
-            } else {
-                btnConsole.classList.add('hidden');
-            }
+            if (utente.ruolo === "Amministratore") btnConsole.classList.remove('hidden');
+            else btnConsole.classList.add('hidden');
         }
         
         window.navigaA('magazzino');
     } else {
-        mostraMessaggio("⚠️ Email o Password errate. Riprova.", "error");
+        alert("⚠️ Email o Password errate.");
     }
 });
 
-// GESTORE DELLA REGISTRAZIONE
+// REGISTRAZIONE CON NUOVI CAMPI ED EMAIL AUTOMATICHE (1 e 2)
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const nome = document.getElementById('reg-nome').value.trim();
+    const titolare = document.getElementById('reg-titolare').value.trim();
+    const gelateria = document.getElementById('reg-gelateria').value.trim();
+    const indirizzo = document.getElementById('reg-indirizzo').value.trim();
     const email = document.getElementById('reg-email').value.trim();
     const pass = document.getElementById('reg-password').value;
     
     if (pass.length < 4) {
-        mostraMessaggio("⚠️ La password deve contenere almeno 4 caratteri.", "error");
+        alert("⚠️ La password deve contenere almeno 4 caratteri.");
         return;
     }
 
     let utenti = JSON.parse(localStorage.getItem('erp_utenti'));
-    
     if (utenti.some(u => u.email === email)) {
-        mostraMessaggio("⚠️ Questo indirizzo email è già registrato.", "error");
+        alert("⚠️ Email già registrata.");
         return;
     }
 
-    utenti.push({ email, pass, nome, ruolo: "Operatore" });
+    // Salva l'utente impostando 'approvato: false'
+    utenti.push({ 
+        email, pass, nome: titolare, gelateria, indirizzo, 
+        ruolo: "Operatore", approvato: false 
+    });
     localStorage.setItem('erp_utenti', JSON.stringify(utenti));
 
-    const defaultIngredienti = JSON.parse(localStorage.getItem('master_default_ingredienti'));
-    localStorage.setItem('mp_inventario', JSON.stringify(defaultIngredienti));
-
-    mostraMessaggio("🎉 Registrazione completata! Pacchetto iniziale inserito.", "success");
+    alert("🎉 Richiesta inviata con successo! Il tuo profilo è in attesa di approvazione.");
     document.getElementById('register-form').reset();
-    
+    window.mostraLogin();
+
+    // EMAIL 1: Al cliente appena registrato
     setTimeout(() => {
-        window.mostraLogin();
-        document.getElementById('login-email').value = email;
-    }, 2000);
+        window.simulaInvioEmail(
+            "📧 Email inviata a: " + email,
+            "Ciao " + titolare + ", abbiamo ricevuto la tua richiesta per la gelateria <strong>" + gelateria + "</strong>. Il nostro team verificherà i dati il prima possibile!"
+        );
+    }, 1500);
+
+    // EMAIL 2: A te (Saimon Admin) per avvisarti della revisione
+    setTimeout(() => {
+        window.simulaInvioEmail(
+            "📧 Email ricevuta da: Saimon Admin (admin@gelateria.com)",
+            "Un nuovo utente si è registrato!<br><strong>Titolare:</strong> " + titolare + "<br><strong>Gelateria:</strong> " + gelateria + "<br><strong>Sede:</strong> " + indirizzo + "<br>Accedi alla Console Master per approvarlo o rifiutarlo."
+        );
+    }, 5000);
 });
 
-// FUNZIONE DI LOGOUT
 window.logout = function() {
     utenteCorrente = null;
-    const d1 = document.getElementById('app-container');
-    const d2 = document.getElementById('app-dashboard');
-    if(d1) d1.classList.add('hidden');
-    if(d2) d2.classList.add('hidden');
-    
+    document.getElementById('app-container').classList.add('hidden');
     document.getElementById('auth-container').classList.remove('hidden');
-    document.getElementById('login-form').reset();
     window.mostraLogin();
 };
 
-// ROUTER CENTRALE ASINCRONO
 window.navigaA = async function(sezione) {
-    const contenitore = document.getElementById('contenuto-dinamico') || document.getElementById('main-content');
+    const contenitore = document.getElementById('contenuto-dinamico');
     if (!contenitore) return;
-    
-    ['magazzino', 'ricette', 'produzione', 'analisi', 'console'].forEach(s => {
-        const btn = document.getElementById(`btn-${s}`);
-        if(btn) {
-            btn.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer";
-        }
-    });
-    
-    const btnAttivo = document.getElementById(`btn-${sezione}`);
-    if(btnAttivo) {
-        btnAttivo.className = "w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-indigo-600 text-white transition cursor-pointer";
-    }
 
     try {
         const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
-        if(!risposta.ok) throw new Error(`Impossibile trovare il file sezioni/${sezione}/${sezione}.html`);
+        if(!risposta.ok) throw new Error("File non trovato");
         const html = await risposta.text();
-        
         contenitore.innerHTML = html;
 
         const vecchioScript = document.getElementById('script-sezione');
@@ -161,11 +144,7 @@ window.navigaA = async function(sezione) {
         nuovoScript.id = 'script-sezione';
         nuovoScript.src = `sezioni/${sezione}/${sezione}.js?v=${new Date().getTime()}`;
         document.body.appendChild(nuovoScript);
-
     } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">
-            <strong>Errore di caricamento:</strong> ${error.message}<br>
-            <span class="text-xs text-slate-400">Verifica che la cartella su GitHub si chiami esattamente <code>sezioni/${sezione}/</code> in minuscolo.</span>
-        </div>`;
+        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 rounded-lg">Errore nel caricamento del modulo ${sezione}.</div>`;
     }
 };
