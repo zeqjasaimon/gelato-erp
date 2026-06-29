@@ -32,13 +32,16 @@ window.mostraLogin = function() {
 
 function mostraMessaggio(testo, tipo) {
     const msg = document.getElementById('auth-message');
-    msg.innerText = testo;
-    msg.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
-    msg.classList.add(tipo === 'error' ? 'text-red-400' : 'text-emerald-400');
+    if(msg) {
+        msg.innerText = testo;
+        msg.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
+        msg.classList.add(tipo === 'error' ? 'text-red-400' : 'text-emerald-400');
+    }
 }
 
 function nascondiMessaggio() {
-    document.getElementById('auth-message').classList.add('hidden');
+    const msg = document.getElementById('auth-message');
+    if(msg) msg.classList.add('hidden');
 }
 
 // GESTORE DEL LOGIN
@@ -52,11 +55,21 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     
     if (utente) {
         utenteCorrente = utente;
-        document.getElementById('auth-container').classList.add('hidden');
-        document.getElementById('app-dashboard' ? 'app-dashboard' : 'app-container').classList.remove('hidden');
         
-        document.getElementById('user-display').innerText = utente.nome;
-        document.getElementById('role-display').innerText = utente.ruolo;
+        // Nascondi il login
+        document.getElementById('auth-container').classList.add('hidden');
+        
+        // Mostra la dashboard (gestisce sia app-container che app-dashboard per sicurezza)
+        const d1 = document.getElementById('app-container');
+        const d2 = document.getElementById('app-dashboard');
+        if(d1) d1.classList.remove('hidden');
+        if(d2) d2.classList.remove('hidden');
+        
+        // Aggiorna i testi del profilo operatore
+        const uDisp = document.getElementById('user-display');
+        const rDisp = document.getElementById('role-display');
+        if(uDisp) uDisp.innerText = utente.nome;
+        if(rDisp) rDisp.innerText = utente.ruolo;
         
         // Sblocca la Console Master se l'utente è l'Admin Master
         const btnConsole = document.getElementById('btn-console');
@@ -93,11 +106,9 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
         return;
     }
 
-    // Registra l'utente come Operatore standard
     utenti.push({ email, pass, nome, ruolo: "Operatore" });
     localStorage.setItem('erp_utenti', JSON.stringify(utenti));
 
-    // Carica il catalogo impostato dal Super-Admin per inizializzare il magazzino privato del nuovo utente
     const defaultIngredienti = JSON.parse(localStorage.getItem('master_default_ingredienti'));
     localStorage.setItem('mp_inventario', JSON.stringify(defaultIngredienti));
 
@@ -113,13 +124,17 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
 // FUNZIONE DI LOGOUT
 window.logout = function() {
     utenteCorrente = null;
-    document.getElementById('app-dashboard' ? 'app-dashboard' : 'app-container').classList.add('hidden');
+    const d1 = document.getElementById('app-container');
+    const d2 = document.getElementById('app-dashboard');
+    if(d1) d1.classList.add('hidden');
+    if(d2) d2.classList.add('hidden');
+    
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('login-form').reset();
     window.mostraLogin();
 };
 
-// ROUTER CENTRALE ASINCRONO
+// ROUTER CENTRALE ASINCRONO (Compatibile al 100% con i percorsi GitHub)
 window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico') || document.getElementById('main-content');
     if (!contenitore) return;
@@ -137,8 +152,9 @@ window.navigaA = async function(sezione) {
     }
 
     try {
+        // Percorso relativo puro, ideale per GitHub Pages
         const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
-        if(!risposta.ok) throw new Error("File non trovato");
+        if(!risposta.ok) throw new Error(`Impossibile trovare il file sezioni/${sezione}/${sezione}.html`);
         const html = await risposta.text();
         
         contenitore.innerHTML = html;
@@ -152,6 +168,9 @@ window.navigaA = async function(sezione) {
         document.body.appendChild(nuovoScript);
 
     } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">Impossibile caricare il modulo ${sezione}. Assicurati che i file esistano su GitHub nella cartella corretta.</div>`;
+        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">
+            <strong>Errore di caricamento:</strong> ${error.message}<br>
+            <span class="text-xs text-slate-400">Verifica che la cartella su GitHub si chiami esattamente <code>sezioni/${sezione}/</code> in minuscolo.</span>
+        </div>`;
     }
 };
