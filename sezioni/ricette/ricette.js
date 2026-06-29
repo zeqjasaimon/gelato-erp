@@ -7,12 +7,12 @@
     let ingredientiSelezionati = [];
 
     // RICETTA DI DEFAULT BLINDATA (Miscela Base Pastorizzata)
-    const ID_RICETTA_PASTORIZZATA = 999999; // ID fisso univoco per riconoscerla
+    const ID_RICETTA_PASTORIZZATA = 999999;
     const ricettaPastorizzataDefault = {
         id: ID_RICETTA_PASTORIZZATA,
         nome: "Miscela Base Pastorizzata",
         tipo: "Semilavorato",
-        blindata: true, // Flag per impedire l'eliminazione
+        blindata: true,
         pesoTotale: 1.000,
         ingredienti: [
             { nome: "Latte Intero Alta Qualità", quantita: 0.700, prezzo: 1.10 },
@@ -22,23 +22,34 @@
     };
 
     function caricaDati(chiave, defaultData) {
-        return JSON.parse(localStorage.getItem(chiave)) || defaultData;
+        try {
+            return JSON.parse(localStorage.getItem(chiave)) || defaultData;
+        } catch(e) {
+            return defaultData;
+        }
     }
 
     function salvaDati(chiave, dati) {
         localStorage.setItem(chiave, JSON.stringify(dati));
     }
 
-    // INIZIALIZZA LA SCHERMATA E GARANTISCE LA RICETTA DI DEFAULT
+    // INIZIALIZZA LA SCHERMATA E FORZA LA VOCE DI DEFAULT
     function inizializzaRicettario() {
         ingredientiSelezionati = [];
         
-        // Verifica e inserisce la ricetta fissa se non esiste
         let ricette = caricaDati(KEY_RICETTE, []);
-        let esistePastorizzata = ricette.some(r => r.id === ID_RICETTA_PASTORIZZATA || r.nome.toLowerCase().trim() === "miscela base pastorizzata");
         
-        if (!esistePastorizzata) {
-            ricette.unshift(ricettaPastorizzataDefault); // La mette in cima
+        // CONTROLLO FORZATO: Cerca per ID specifico se c'è la pastorizzata
+        let indicePastorizzata = ricette.findIndex(r => r.id === ID_RICETTA_PASTORIZZATA);
+        
+        if (indicePastorizzata === -1) {
+            // Se non c'è proprio, la spingiamo in cima alla lista
+            ricette.unshift(ricettaPastorizzataDefault);
+            salvaDati(KEY_RICETTE, ricette);
+        } else {
+            // Se c'è ma era la vecchia versione, assicuriamoci che abbia i flag corretti
+            ricette[indicePastorizzata].blindata = true;
+            ricette[indicePastorizzata].tipo = "Semilavorato";
             salvaDati(KEY_RICETTE, ricette);
         }
 
@@ -160,7 +171,6 @@
         alert(`🎉 Ricetta "${nomeRicetta}" salvata correttamente!`);
     };
 
-    // ELIMINA RICETTA CON BLOCCO PER QUELLA PREIMPOSTATA
     window.eliminaRicetta = function(id, blindata) {
         if (blindata || id === ID_RICETTA_PASTORIZZATA) {
             alert("🔒 Questa è una ricetta di sistema predefinita (Semilavorato Base). Non può essere eliminata.");
@@ -203,10 +213,9 @@
             const costoAlKgAttuale = costoTotaleAggiornato / (ricetta.pesoTotale || 1);
             const badgeColore = ricetta.tipo === 'Semilavorato' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
             
-            // Gestione icona cestino o lucchetto
             const èBlindata = ricetta.blindata === true || ricetta.id === ID_RICETTA_PASTORIZZATA;
             const bottoneElimina = èBlindata 
-                ? `<span class="text-slate-600 p-1 cursor-not-allowed" title="Ricetta fissa di sistema"><i class="fa-solid fa-lock text-sm text-amber-500/70"></i></span>`
+                ? `<span class="text-slate-600 p-1 cursor-not-allowed"><i class="fa-solid fa-lock text-sm text-amber-500/70"></i></span>`
                 : `<button onclick="eliminaRicetta(${ricetta.id}, false)" class="text-slate-500 hover:text-rose-400 p-1 transition cursor-pointer"><i class="fa-regular fa-trash-can"></i></button>`;
 
             contenitore.innerHTML += `
