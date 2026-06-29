@@ -1,12 +1,32 @@
-// Inizializza l'archivio utenti e l'admin se non esistono
-if (!localStorage.getItem('erp_utenti')) {
-    const utentiIniziali = [
-        { email: "admin@gelateria.com", pass: "master2027", nome: "Saimon Admin", ruolo: "Amministratore", approvato: true, gelateria: "Master HQ", indirizzo: "Arco, TN" }
-    ];
-    localStorage.setItem('erp_utenti', JSON.stringify(utentiIniziali));
+// Inizializza l'archivio utenti e garantisce i privilegi dell'Admin Master ad ogni avvio
+let utentiSalvati = JSON.parse(localStorage.getItem('erp_utenti')) || [];
+
+// Cerchiamo se l'admin esiste già nel database locale
+let adminEsistente = utentiSalvati.find(u => u.email === "admin@gelateria.com");
+
+if (!adminEsistente) {
+    // Se non esiste, lo creiamo da zero approvato
+    utentiSalvati.push({
+        email: "admin@gelateria.com",
+        pass: "master2027",
+        nome: "Saimon Admin",
+        ruolo: "Amministratore",
+        approvato: true,
+        gelateria: "Master HQ",
+        indirizzo: "Arco, TN"
+    });
+    localStorage.setItem('erp_utenti', JSON.stringify(utentiSalvati));
+} else {
+    // SE ESISTE GIÀ: Forza i campi per evitare blocchi dovuti a vecchie cache
+    if (adminEsistente.approvato !== true || adminEsistente.ruolo !== "Amministratore") {
+        adminEsistente.approvato = true;
+        adminEsistente.ruolo = "Amministratore";
+        adminEsistente.nome = "Saimon Admin"; // Corregge anche il nome se era vecchio
+        localStorage.setItem('erp_utenti', JSON.stringify(utentiSalvati));
+    }
 }
 
-// Ingredienti di default
+// Configurazione ingredienti di default se non presenti
 if (!localStorage.getItem('master_default_ingredienti')) {
     const defaultIngredienti = [
         { id: 1, nome: "Latte Intero Alta Qualità", cat: "Base Liquida", qta: 100, min: 50, prezzo: 1.10 },
@@ -62,8 +82,11 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
         
         const btnConsole = document.getElementById('btn-console');
         if (btnConsole) {
-            if (utente.ruolo === "Amministratore") btnConsole.classList.remove('hidden');
-            else btnConsole.classList.add('hidden');
+            if (utente.ruolo === "Amministratore") {
+                btnConsole.classList.remove('hidden');
+            } else {
+                btnConsole.classList.add('hidden');
+            }
         }
         
         window.navigaA('magazzino');
@@ -72,7 +95,7 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     }
 });
 
-// REGISTRAZIONE CON NUOVI CAMPI ED EMAIL AUTOMATICHE (1 e 2)
+// REGISTRAZIONE UTENTI
 document.getElementById('register-form').addEventListener('submit', function(e) {
     e.preventDefault();
     const titolare = document.getElementById('reg-titolare').value.trim();
@@ -92,7 +115,6 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
         return;
     }
 
-    // Salva l'utente impostando 'approvato: false'
     utenti.push({ 
         email, pass, nome: titolare, gelateria, indirizzo, 
         ruolo: "Operatore", approvato: false 
@@ -103,7 +125,6 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
     document.getElementById('register-form').reset();
     window.mostraLogin();
 
-    // EMAIL 1: Al cliente appena registrato
     setTimeout(() => {
         window.simulaInvioEmail(
             "📧 Email inviata a: " + email,
@@ -111,7 +132,6 @@ document.getElementById('register-form').addEventListener('submit', function(e) 
         );
     }, 1500);
 
-    // EMAIL 2: A te (Saimon Admin) per avvisarti della revisione
     setTimeout(() => {
         window.simulaInvioEmail(
             "📧 Email ricevuta da: Saimon Admin (admin@gelateria.com)",
