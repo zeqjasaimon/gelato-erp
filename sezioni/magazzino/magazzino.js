@@ -1,13 +1,11 @@
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 (function() {
-    // Recuperiamo l'istanza del database Cloud passata da app.js
     const db = window.fbDb;
     const auth = window.fbAuth;
 
     let idArticoloInModifica = null;
 
-    // Funzione interna per verificare che l'utente sia effettivamente loggato su Firebase
     function getUidUtente() {
         if (auth && auth.currentUser) {
             return auth.currentUser.uid;
@@ -15,7 +13,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         return null;
     }
 
-    // INIZIALIZZA IL MAGAZZINO CLOUD
     async function inizializzaMagazzino() {
         idArticoloInModifica = null;
         const uid = getUidUtente();
@@ -25,18 +22,15 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             return;
         }
 
-        // Reset visivo del form
         const form = document.getElementById('form-aggiungi-mp');
         if (form) form.reset();
         
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
 
-        // Scarica i dati dal Cloud e renderizza la tabella
         await renderTabellaMagazzino();
     }
 
-    // FUNZIONE PER SCARICARE L'ARRAY DI ARTICOLI DA FIREBASE
     async function ottieniArticoliCloud(uid) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -50,18 +44,16 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         return [];
     }
 
-    // FUNZIONE PER SALVARE L'ARRAY DI ARTICOLI SU FIREBASE
     async function salvaArticoliCloud(uid, articoli) {
         try {
             const docRef = doc(db, "magazzini", uid);
-            await setDoc(docRef, { articoli: articles || articoli });
+            await setDoc(docRef, { articoli: articoli });
         } catch (error) {
             console.error("Errore nel salvataggio dei dati sul Cloud:", error);
             alert("⚠️ Errore di connessione al Cloud. Riprova.");
         }
     }
 
-    // GESTIONE INSERIMENTO O MODIFICA ARTICOLO CLOUD
     const formMp = document.getElementById('form-aggiungi-mp');
     if (formMp) {
         const nuovoForm = formMp.cloneNode(true);
@@ -72,7 +64,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const uid = getUidUtente();
             if (!uid) return;
 
-            // Mappatura universale per trovare i campi con qualsiasi ID (vecchio o nuovo)
             const elNome = document.getElementById('mp-nome') || document.getElementById('nome');
             const elCat = document.getElementById('mp-categoria') || document.getElementById('categoria');
             const elQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta') || document.getElementById('giacenza');
@@ -93,7 +84,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             let inventario = await ottieniArticoliCloud(uid);
 
             if (idArticoloInModifica !== null) {
-                // MODALITÀ AGGIORNAMENTO SU CLOUD
                 let indice = inventario.findIndex(item => item.id === idArticoloInModifica);
                 if (indice !== -1) {
                     inventario[indice].nome = nome;
@@ -104,7 +94,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                     alert(`🎉 Ingrediente "${nome}" aggiornato sul Cloud!`);
                 }
             } else {
-                // MODALITÀ NUOVO ARTICOLO SU CLOUD
                 if (inventario.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
                     alert("⚠️ Un ingrediente con questo nome è già presente in magazzino.");
                     return;
@@ -126,7 +115,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         });
     }
 
-    // FUNZIONE PARACADUTE: Se l'HTML cerca la vecchia modale, sposta il focus sul form
     window.apriModalMateria = function() {
         const inputNome = document.getElementById('mp-nome') || document.getElementById('nome');
         if (inputNome) {
@@ -135,7 +123,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     };
 
-    // CARICA L'ARTICOLO NEL FORM IN ALTO PER LA MODIFICA
     window.avviaModificaArticolo = async function(id) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -164,7 +151,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         if (elNome) elNome.focus();
     };
 
-    // MOVIMENTO RAPIDO DI CARICO/SCARICO SUL CLOUD
     window.aggiornaGiacenzaRapida = async function(id) {
         const uid = getUidUtente();
         const input = document.getElementById(`rapido-${id}`);
@@ -184,7 +170,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     };
 
-    // ELIMINA ARTICOLO DAL CLOUD
     window.eliminaArticoloMagazzino = async function(id, nome) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -198,7 +183,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         inizializzaMagazzino();
     };
 
-    // RENDERING DELLA TABELLA CON I DATI IN TEMPO REALE
     async function renderTabellaMagazzino() {
         const uid = getUidUtente();
         if (!uid) return;
@@ -253,6 +237,5 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         });
     }
 
-    // Eseguiamo il boot iniziale aspettando una frazione di secondo che Firebase dichiari l'utente loggato
     setTimeout(inizializzaMagazzino, 400);
 })();
