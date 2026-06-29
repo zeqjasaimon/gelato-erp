@@ -1,15 +1,42 @@
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 (function() {
+    // Recuperiamo l'istanza del database Cloud passata da app.js
     const db = window.fbDb;
     const auth = window.fbAuth;
 
     let idArticoloInModifica = null;
 
+    // Funzione interna per verificare che l'utente sia effettivamente loggato su Firebase
     function getUidUtente() {
-        return auth && auth.currentUser ? auth.currentUser.uid : null;
+        if (auth && auth.currentUser) {
+            return auth.currentUser.uid;
+        }
+        return null;
     }
 
+    // INIZIALIZZA IL MAGAZZINO CLOUD
+    async function inizializzaMagazzino() {
+        idArticoloInModifica = null;
+        const uid = getUidUtente();
+        
+        if (!uid) {
+            console.error("Nessun utente loggato su Firebase.");
+            return;
+        }
+
+        // Reset visivo del form
+        const form = document.getElementById('form-aggiungi-mp');
+        if (form) form.reset();
+        
+        const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
+        if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
+
+        // Scarica i dati dal Cloud e renderizza la tabella
+        await renderTabellaMagazzino();
+    }
+
+    // FUNZIONE PER SCARICARE L'ARRAY DI ARTICOLI DA FIREBASE
     async function ottieniArticoliCloud(uid) {
         try {
             const docRef = doc(db, "magazzini", uid);
@@ -18,44 +45,34 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                 return docSnap.data().articoli || [];
             }
         } catch (error) {
-            console.error("Errore recupero cloud:", error);
+            console.error("Errore nel recupero dei dati dal Cloud:", error);
         }
         return [];
     }
 
+    // FUNZIONE PER SALVARE L'ARRAY DI ARTICOLI SU FIREBASE
     async function salvaArticoliCloud(uid, articoli) {
         try {
             const docRef = doc(db, "magazzini", uid);
-            await setDoc(docRef, { articoli: articoli });
+            await setDoc(docRef, { articoli: articles || articoli });
         } catch (error) {
-            console.error("Errore salvataggio cloud:", error);
-            alert("⚠️ Errore di connessione. Modifiche non salvate online.");
+            console.error("Errore nel salvataggio dei dati sul Cloud:", error);
+            alert("⚠️ Errore di connessione al Cloud. Riprova.");
         }
     }
 
-    async function inizializzaMagazzino() {
-        idArticoloInModifica = null;
-        const uid = getUidUtente();
-        if (!uid) return;
-
-        const form = document.getElementById('form-aggiungi-mp');
-        if (form) form.reset();
-        
-        const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
-        if (btnSalva) btnSalva.innerText = "💾 Inserisci in Magazzino";
-
-        await renderTabellaMagazzino();
-    }
-
-    // Gestione submit del form senza cloni o manipolazioni strutturali del DOM
+    // GESTIONE INSERIMENTO O MODIFICA ARTICOLO CLOUD
     const formMp = document.getElementById('form-aggiungi-mp');
     if (formMp) {
-        formMp.onsubmit = async function(e) {
+        const nuovoForm = formMp.cloneNode(true);
+        formMp.parentNode.replaceChild(nuovoForm, formMp);
+
+        nuovoForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             const uid = getUidUtente();
             if (!uid) return;
 
-            // Recupero universale dei campi provando sia i vecchi che i nuovi ID
+            // Mappatura universale per trovare i campi con qualsiasi ID (vecchio o nuovo)
             const elNome = document.getElementById('mp-nome') || document.getElementById('nome');
             const elCat = document.getElementById('mp-categoria') || document.getElementById('categoria');
             const elQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta') || document.getElementById('giacenza');
@@ -76,6 +93,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             let inventario = await ottieniArticoliCloud(uid);
 
             if (idArticoloInModifica !== null) {
+                // MODALITÀ AGGIORNAMENTO SU CLOUD
                 let indice = inventario.findIndex(item => item.id === idArticoloInModifica);
                 if (indice !== -1) {
                     inventario[indice].nome = nome;
@@ -83,22 +101,41 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
                     inventario[indice].qta = qta;
                     inventario[indice].min = min;
                     inventario[indice].prezzo = prezzo;
-                    alert(`🎉 Ingrediente "${nome}" aggiornato!`);
+                    alert(`🎉 Ingrediente "${nome}" aggiornato sul Cloud!`);
                 }
             } else {
+                // MODALITÀ NUOVO ARTICOLO SU CLOUD
                 if (inventario.some(i => i.nome.toLowerCase() === nome.toLowerCase())) {
-                    alert("⚠️ Questo ingrediente è già presente in magazzino.");
+                    alert("⚠️ Un ingrediente con questo nome è già presente in magazzino.");
                     return;
                 }
-                inventario.push({ id: Date.now(), nome, cat, qta, min, prezzo });
-                alert(`🎉 Ingrediente "${nome}" inserito!`);
+
+                inventario.push({
+                    id: Date.now(),
+                    nome: nome,
+                    cat: cat,
+                    qta: qta,
+                    min: min,
+                    prezzo: prezzo
+                });
+                alert(`🎉 Nuovo ingrediente "${nome}" salvato sul Cloud!`);
             }
 
             await salvaArticoliCloud(uid, inventario);
-            await inizializzaMagazzino();
-        };
+            inizializzaMagazzino();
+        });
     }
 
+    // FUNZIONE PARACADUTE: Se l'HTML cerca la vecchia modale, sposta il focus sul form
+    window.apriModalMateria = function() {
+        const inputNome = document.getElementById('mp-nome') || document.getElementById('nome');
+        if (inputNome) {
+            inputNome.scrollIntoView({ behavior: 'smooth' });
+            inputNome.focus();
+        }
+    };
+
+    // CARICA L'ARTICOLO NEL FORM IN ALTO PER LA MODIFICA
     window.avviaModificaArticolo = async function(id) {
         const uid = getUidUtente();
         if (!uid) return;
@@ -115,18 +152,19 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         const elMin = document.getElementById('mp-scorta') || document.getElementById('mp-min') || document.getElementById('scorta');
         const elPrezzo = document.getElementById('mp-prezzo') || document.getElementById('prezzo');
 
-        if(elNome) elNome.value = articolo.nome;
-        if(elCat) elCat.value = articolo.cat || 'Base Liquida';
-        if(elQta) elQta.value = articolo.qta;
-        if(elMin) elMin.value = articolo.min;
-        if(elPrezzo) elPrezzo.value = articolo.prezzo;
+        if (elNome) elNome.value = articolo.nome;
+        if (elCat) elCat.value = articolo.cat || 'Base Liquida';
+        if (elQta) elQta.value = articolo.qta;
+        if (elMin) elMin.value = articolo.min;
+        if (elPrezzo) elPrezzo.value = articolo.prezzo;
 
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
         if (btnSalva) btnSalva.innerText = "🔄 Aggiorna Articolo";
 
-        if(elNome) elNome.focus();
+        if (elNome) elNome.focus();
     };
 
+    // MOVIMENTO RAPIDO DI CARICO/SCARICO SUL CLOUD
     window.aggiornaGiacenzaRapida = async function(id) {
         const uid = getUidUtente();
         const input = document.getElementById(`rapido-${id}`);
@@ -146,19 +184,21 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         }
     };
 
+    // ELIMINA ARTICOLO DAL CLOUD
     window.eliminaArticoloMagazzino = async function(id, nome) {
         const uid = getUidUtente();
         if (!uid) return;
 
-        if (!confirm(`Sei sicuro di voler eliminare "${nome}"?`)) return;
+        if (!confirm(`Sei sicuro di voler eliminare "${nome}" dal magazzino Cloud?`)) return;
         
         let inventario = await ottieniArticoliCloud(uid);
         inventario = inventario.filter(i => i.id !== id);
         
         await salvaArticoliCloud(uid, inventario);
-        await inizializzaMagazzino();
+        inizializzaMagazzino();
     };
 
+    // RENDERING DELLA TABELLA CON I DATI IN TEMPO REALE
     async function renderTabellaMagazzino() {
         const uid = getUidUtente();
         if (!uid) return;
@@ -213,5 +253,6 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
         });
     }
 
+    // Eseguiamo il boot iniziale aspettando una frazione di secondo che Firebase dichiari l'utente loggato
     setTimeout(inizializzaMagazzino, 400);
 })();
