@@ -9,6 +9,7 @@
 </head>
 <body class="bg-slate-900 text-slate-100 font-sans antialiased">
 
+    <!-- LANDING PAGE, LOGIN & REGISTRAZIONE -->
     <div id="auth-container" class="min-h-screen flex flex-col justify-center items-center px-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950">
         <div class="max-w-md w-full bg-slate-800/50 backdrop-blur-md p-8 rounded-2xl border border-slate-700/50 shadow-2xl">
             
@@ -20,6 +21,7 @@
                 <p class="text-slate-400 mt-2 text-sm">Laboratorio Intelligente & Controllo Produzione</p>
             </div>
 
+            <!-- FORM DI ACCESSO (LOGIN) -->
             <div id="box-login" class="mt-8">
                 <h3 class="text-lg font-bold text-white mb-4">Accedi al tuo Laboratorio</h3>
                 <form id="login-form" class="space-y-4">
@@ -40,6 +42,7 @@
                 </p>
             </div>
 
+            <!-- FORM DI REGISTRAZIONE (NUOVO ACCOUNT) -->
             <div id="box-register" class="mt-8 hidden">
                 <h3 class="text-lg font-bold text-white mb-4">Crea un nuovo Profilo Gelateria</h3>
                 <form id="register-form" class="space-y-4">
@@ -64,10 +67,12 @@
                 </p>
             </div>
 
+            <!-- Messaggi di Errore o Successo Dinamici -->
             <p id="auth-message" class="text-xs text-center mt-3 font-medium hidden"></p>
         </div>
     </div>
 
+    <!-- STRUTTURA APPLICAZIONE -->
     <div id="app-container" class="hidden min-h-screen flex flex-col md:flex-row">
         <aside class="w-full md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between p-4">
             <div>
@@ -88,6 +93,10 @@
                     <button onclick="navigaA('analisi')" id="btn-analisi" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer">
                         <i class="fa-solid fa-chart-pie w-5"></i> <span>Analisi & Costi</span>
                     </button>
+                    <!-- Bottone per la Console Master (Amministratore) -->
+                    <button onclick="navigaA('console')" id="btn-console" class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-slate-900 hover:text-white transition cursor-pointer hidden">
+                        <i class="fa-solid fa-sliders w-5 text-amber-400"></i> <span class="font-semibold text-amber-200">Console Master</span>
+                    </button>
                 </nav>
             </div>
             
@@ -102,6 +111,7 @@
             </div>
         </aside>
 
+        <!-- Area Contenuto Dinamico -->
         <main class="flex-1 p-6 md:p-8 overflow-y-auto" id="contenuto-dinamico"></main>
     </div>
 
