@@ -72,10 +72,18 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
             const uid = getUidUtente();
             if (!uid) return;
 
+            // Mappatura corretta degli ID reali presenti nel form HTML della pagina
             const nome = document.getElementById('mp-nome').value.trim();
             const cat = document.getElementById('mp-categoria').value;
-            const qta = parseFloat(document.getElementById('mp-qta').value) || 0;
-            const min = parseFloat(document.getElementById('mp-min').value) || 0;
+            
+            // Fix ID: Prova prima mp-quantita o mp-qta se modificato, altrimenti 0
+            const inputQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta');
+            const qta = inputQta ? (parseFloat(inputQta.value) || 0) : 0;
+            
+            // Fix ID: Prova prima mp-scorta o mp-min se modificato, altrimenti 0
+            const inputMin = document.getElementById('mp-scorta') || document.getElementById('mp-min');
+            const min = inputMin ? (parseFloat(inputMin.value) || 0) : 0;
+            
             const prezzo = parseFloat(document.getElementById('mp-prezzo').value) || 0;
 
             let inventario = await ottieniArticoliCloud(uid);
@@ -127,8 +135,13 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/f
 
         document.getElementById('mp-nome').value = articolo.nome;
         document.getElementById('mp-categoria').value = articolo.cat || 'Base Liquida';
-        document.getElementById('mp-qta').value = articolo.qta;
-        document.getElementById('mp-min').value = articolo.min;
+        
+        const inputQta = document.getElementById('mp-quantita') || document.getElementById('mp-qta');
+        if (inputQta) inputQta.value = articolo.qta;
+        
+        const inputMin = document.getElementById('mp-scorta') || document.getElementById('mp-min');
+        if (inputMin) inputMin.value = articolo.min;
+        
         document.getElementById('mp-prezzo').value = articolo.prezzo;
 
         const btnSalva = document.querySelector('#form-aggiungi-mp button[type="submit"]');
