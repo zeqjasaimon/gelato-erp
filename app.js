@@ -56,22 +56,18 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
     if (utente) {
         utenteCorrente = utente;
         
-        // Nascondi il login
         document.getElementById('auth-container').classList.add('hidden');
         
-        // Mostra la dashboard (gestisce sia app-container che app-dashboard per sicurezza)
         const d1 = document.getElementById('app-container');
         const d2 = document.getElementById('app-dashboard');
         if(d1) d1.classList.remove('hidden');
         if(d2) d2.classList.remove('hidden');
         
-        // Aggiorna i testi del profilo operatore
         const uDisp = document.getElementById('user-display');
         const rDisp = document.getElementById('role-display');
         if(uDisp) uDisp.innerText = utente.nome;
         if(rDisp) rDisp.innerText = utente.ruolo;
         
-        // Sblocca la Console Master se l'utente è l'Admin Master
         const btnConsole = document.getElementById('btn-console');
         if (btnConsole) {
             if (utente.ruolo === "Amministratore") {
@@ -134,7 +130,7 @@ window.logout = function() {
     window.mostraLogin();
 };
 
-// ROUTER CENTRALE ASINCRONO (Compatibile al 100% con i percorsi GitHub)
+// ROUTER CENTRALE ASINCRONO
 window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico') || document.getElementById('main-content');
     if (!contenitore) return;
@@ -152,7 +148,6 @@ window.navigaA = async function(sezione) {
     }
 
     try {
-        // Percorso relativo puro, ideale per GitHub Pages
         const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
         if(!risposta.ok) throw new Error(`Impossibile trovare il file sezioni/${sezione}/${sezione}.html`);
         const html = await risposta.text();
