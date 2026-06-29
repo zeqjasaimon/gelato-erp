@@ -1,16 +1,77 @@
 <div class="space-y-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div class="flex justify-between items-center">
         <div>
-            <h2 class="text-2xl font-bold tracking-tight">Bilanciamento Ricette</h2>
-            <p class="text-slate-400 text-sm">Archivio formule e miscele matematicamente bilanciate.</p>
+            <h2 class="text-2xl font-black text-white tracking-tight">Ricettario Master</h2>
+            <p class="text-xs text-slate-400">Bilancia le tue basi e i tuoi gusti finiti calcolando i costi reali.</p>
         </div>
-        <button onclick="nuovaRicetta()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition flex items-center gap-2 self-start">
-            <i class="fa-solid fa-calculator"></i> Crea Nuova Miscela
-        </button>
     </div>
 
-    <!-- Griglia Ricette -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="griglia-ricette">
-        <!-- Iniettate via JS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-xl">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-amber-400"><i class="fa-solid fa-calculator mr-2"></i>Nuovo Bilanciamento</h3>
+            
+            <form id="form-crea-ricetta" onsubmit="salvaRicettaCompleta(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Nome Ricetta</label>
+                    <input type="text" id="nome-ricetta" placeholder="es. Fior di Latte, Nocciola..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500" required>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Tipologia Ricetta</label>
+                    <select id="tipo-ricetta" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500">
+                        <option value="Gusto">Gusto Finale (da Banco)</option>
+                        <option value="Semilavorato">Semilavorato / Base Pastorizzata</option>
+                    </select>
+                </div>
+
+                <div class="border-t border-slate-800/60 pt-3 space-y-2">
+                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Inserisci Ingredienti</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <select id="seleziona-materia-prima" class="col-span-2 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white focus:outline-none"></select>
+                        <input type="number" id="quantita-materia-prima" step="0.001" placeholder="Kg" class="col-span-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-white text-right focus:outline-none">
+                    </div>
+                    <button type="button" onclick="aggiungiIngredienteARicetta()" class="w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl py-1.5 text-xs font-semibold transition cursor-pointer">
+                        + Inserisci in Ricetta
+                    </button>
+                </div>
+
+                <div class="bg-slate-950/60 rounded-xl border border-slate-800/80 overflow-hidden max-h-40 overflow-y-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-950 border-b border-slate-800 text-[9px] uppercase font-bold tracking-wider text-slate-500">
+                                <th class="p-2">Ingrediente</th>
+                                <th class="p-2 text-right">Peso</th>
+                                <th class="p-2 text-right">Costo/Kg</th>
+                                <th class="p-2 text-right">Tot.</th>
+                                <th class="p-2"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabella-ingredienti-nuova-ricetta"></tbody>
+                    </table>
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 grid grid-cols-2 gap-2 text-center">
+                    <div>
+                        <p class="text-[9px] text-slate-500 uppercase font-bold">Peso Struttura</p>
+                        <p id="anteprima-peso-totale" class="text-sm font-mono text-sky-400 font-bold">0.000 kg</p>
+                    </div>
+                    <div>
+                        <p class="text-[9px] text-slate-500 uppercase font-bold">Costo Teorico</p>
+                        <p id="anteprima-costo-kg" class="text-sm font-mono text-emerald-400 font-bold">€ 0.00 / kg</p>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white rounded-xl py-2.5 text-sm font-bold shadow-lg shadow-sky-500/10 transition cursor-pointer">
+                    💾 Salva Ricetta nel Libro
+                </button>
+            </form>
+        </div>
+
+        <div class="lg:col-span-2 space-y-4">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400"><i class="fa-solid fa-book-open mr-2"></i>Le tue Ricette Bilanciate</h3>
+            
+            <div id="elenco-ricette-salvate" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                </div>
+        </div>
     </div>
 </div>
