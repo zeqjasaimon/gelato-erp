@@ -1,20 +1,47 @@
-// Database simulato degli utenti autorizzati
-const UTENTI_AUTORIZZATI = [
-    { email: "admin@gelateria.com", pass: "master2027", nome: "Capo Laboratorio", ruolo: "Amministratore" },
-    { email: "operaio@gelateria.com", pass: "gelato123", nome: "Team Produzione", ruolo: "Operatore" }
-];
+// Inizializza l'archivio utenti in memoria se non esiste ancora
+if (!localStorage.getItem('erp_utenti')) {
+    const utentiIniziali = [
+        { email: "admin@gelateria.com", pass: "master2027", nome: "Capo Laboratorio", ruolo: "Amministratore" }
+    ];
+    localStorage.setItem('erp_utenti', JSON.stringify(utentiIniziali));
+}
 
 let utenteCorrente = null;
 
-// Gestore del Login
+// Funzioni per scambiare visivamente i moduli Login / Registrazione
+window.mostraRegistrazione = function() {
+    document.getElementById('box-login').classList.add('hidden');
+    document.getElementById('box-register').classList.remove('hidden');
+    nascondiMessaggio();
+};
+
+window.mostraLogin = function() {
+    document.getElementById('box-register').classList.add('hidden');
+    document.getElementById('box-login').classList.remove('hidden');
+    nascondiMessaggio();
+};
+
+function mostraMessaggio(testo, tipo) {
+    const msg = document.getElementById('auth-message');
+    msg.innerText = testo;
+    msg.classList.remove('hidden', 'text-red-400', 'text-emerald-400');
+    msg.classList.add(tipo === 'error' ? 'text-red-400' : 'text-emerald-400');
+}
+
+function nascondiMessaggio() {
+    document.getElementById('auth-message').classList.add('hidden');
+}
+
+// GESTORE DEL LOGIN
 document.getElementById('login-form').addEventListener('submit', function(e) {
     e.preventDefault();
-    const email = document.getElementById('login-email').value;
+    const email = document.getElementById('login-email').value.trim();
     const pass = document.getElementById('login-password').value;
     
-    const utente = UTENTI_AUTORIZZATI.find(u => u.email === email && u.pass === pass);
+    const utenti = JSON.parse(localStorage.getItem('erp_utenti'));
+    const utente = utenti.find(u => u.email === email && u.pass === pass);
     
-    if(utente) {
+    if (utente) {
         utenteCorrente = utente;
         document.getElementById('auth-container').classList.add('hidden');
         document.getElementById('app-container').classList.remove('hidden');
@@ -22,41 +49,78 @@ document.getElementById('login-form').addEventListener('submit', function(e) {
         document.getElementById('user-display').innerText = utente.nome;
         document.getElementById('role-display').innerText = utente.ruolo;
         
-        // Vai alla sezione di default
         navigaA('magazzino');
     } else {
-        const err = document.getElementById('login-error');
-        err.classList.remove('hidden');
-        setTimeout(() => err.classList.add('hidden'), 4000);
+        mostraMessaggio("⚠️ Email o Password errate. Riprova.", "error");
     }
 });
 
-// Funzione di Logout
-function logout() {
+// GESTORE DELLA REGISTRAZIONE (Nuovo utente)
+document.getElementById('register-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const nome = document.getElementById('reg-nome').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const pass = document.getElementById('reg-password').value;
+    
+    if (pass.length < 4) {
+        mostraMessaggio("⚠️ La password deve contenere almeno 4 caratteri.", "error");
+        return;
+    }
+
+    let utenti = JSON.parse(localStorage.getItem('erp_utenti'));
+    
+    // Controlla se l'email esiste già
+    if (utenti.some(u => u.email === email)) {
+        mostraMessaggio("⚠️ Questo indirizzo email è già registrato.", "error");
+        return;
+    }
+
+    // Aggiungi il nuovo utente all'archivio
+    const nuovoUtente = { email, pass, nome, ruolo: "Amministratore" };
+    utenti.push(nuovoUtente);
+    localStorage.setItem('erp_utenti', JSON.stringify(utenti));
+
+    mostraMessaggio("🎉 Registrazione completata! Ora puoi accedere.", "success");
+    document.getElementById('register-form').reset();
+    
+    // Rimanda al login dopo 2 secondi
+    setTimeout(() => {
+        mostraLogin();
+        document.getElementById('login-email').value = email;
+    }, 2000);
+});
+
+// FUNZIONE DI LOGOUT
+window.logout = function() {
     utenteCorrente = null;
     document.getElementById('app-container').classList.add('hidden');
     document.getElementById('auth-container').classList.remove('hidden');
     document.getElementById('login-form').reset();
-}
+    mostraLogin();
+};
 
-// Router Centrale: Carica le sezioni in modo asincrono
-async function navigaA(sezione) {
+// ROUTER CENTRALE (Per il caricamento asincrono delle sezioni)
+window.navigaA = async function(sezione) {
     const contenitore = document.getElementById('contenuto-dinamico');
+    if (!contenitore) return;
     
-    // Rimuovi lo stato attivo da tutti i bottoni
     ['magazzino', 'ricette', 'produzione', 'analisi'].forEach(s => {
-        document.getElementById(`btn-${s}`).classList.remove('bg-indigo-600', 'text-white');
-        document.getElementById(`btn-${s}`).classList.add('text-slate-400');
+        const btn = document.getElementById(`btn-${s}`);
+        if(btn) {
+            btn.classList.remove('bg-indigo-600', 'text-white');
+            btn.classList.add('text-slate-400');
+        }
     });
     
-    // Attiva il bottone corrente
-    document.getElementById(`btn-${sezione}`).classList.add('bg-indigo-600', 'text-white');
-    document.getElementById(`btn-${sezione}`).classList.remove('text-slate-400');
+    const btnAttivo = document.getElementById(`btn-${sezione}`);
+    if(btnAttivo) {
+        btnAttivo.classList.add('bg-indigo-600', 'text-white');
+        btnAttivo.classList.remove('text-slate-400');
+    }
 
     try {
-        // Rimosso il punto iniziale per rendere il percorso compatibile al 100% con GitHub Pages
         const risposta = await fetch(`sezioni/${sezione}/${sezione}.html`);
-        if(!risposta.ok) throw new Error("Errore nel caricamento del modulo");
+        if(!risposta.ok) throw new Error("File non trovato");
         const html = await risposta.text();
         
         contenitore.innerHTML = html;
@@ -70,6 +134,6 @@ async function navigaA(sezione) {
         document.body.appendChild(nuovoScript);
 
     } catch (error) {
-        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">Impossibile caricare il modulo ${sezione}: ${error.message}</div>`;
+        contenitore.innerHTML = `<div class="p-4 bg-red-900/30 text-red-400 border border-red-800 rounded-lg">Impossibile caricare il modulo ${sezione}. Assicurati che i file esistano su GitHub.</div>`;
     }
-}
+};
